@@ -1,0 +1,73 @@
+package io.github.leodenglovescode.ultimateims.core;
+
+/** 白名单来自 AOSP 定义，不提供任意键名写入接口。原始订阅字段独立于 CarrierConfig。 */
+public enum ConfigKey {
+    VOLTE("carrier_volte_available_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    VOWIFI("carrier_wfc_ims_available_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    WIFI_ONLY("carrier_wfc_supports_wifi_only_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    WFC_MODE("carrier_default_wfc_ims_mode_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    WFC_ROAMING_MODE("carrier_default_wfc_ims_roaming_mode_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    WFC_ROAMING("carrier_default_wfc_ims_roaming_enabled_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    VT("carrier_vt_available_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    VONR("vonr_enabled_bool", RawValue.Kind.BOOLEAN, 34, Scope.CARRIER),
+    CROSS_SIM("carrier_cross_sim_ims_available_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    UT("carrier_supports_ss_over_ut_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    NR_AVAILABILITY("carrier_nr_availabilities_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_RSRP("5g_nr_ssrsrp_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_ADVANCED_BANDWIDTH("nr_advanced_threshold_bandwidth_khz_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    LTE("lte_enabled_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    HIDE_LTE_PLUS("hide_lte_plus_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    SHOW_4G("show_4g_for_lte_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    CARRIER_NAME("carrier_name_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
+    CARRIER_NAME_OVERRIDE("carrier_name_override_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    IMS_USER_AGENT("ims.ims_user_agent_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
+    SIM_COUNTRY("sim_country_iso_override_string", RawValue.Kind.STRING, 34, Scope.CARRIER),
+    VOIMS_OPT_IN("voims_opt_in_status", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    ADVANCED_CALLING_USER("volte_vt_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    PORTAL_HTTP("captive_portal_http_url", RawValue.Kind.STRING, 33, Scope.DEVICE),
+    PORTAL_HTTPS("captive_portal_https_url", RawValue.Kind.STRING, 33, Scope.DEVICE);
+
+    public enum Scope { CARRIER, SUBSCRIPTION, DEVICE }
+    public final String platformName;
+    public final RawValue.Kind kind;
+    public final int minApi;
+    public final Scope scope;
+    ConfigKey(String name, RawValue.Kind kind, int minApi, Scope scope) {
+        this.platformName = name; this.kind = kind; this.minApi = minApi; this.scope = scope;
+    }
+    public void validate(RawValue value, int api) {
+        if (api < minApi) throw new IllegalArgumentException("Unsupported Android API");
+        if (value.kind() == RawValue.Kind.UNSET) return;
+        if (value.kind() != kind) throw new IllegalArgumentException("Invalid value type");
+        if (this == WFC_MODE || this == WFC_ROAMING_MODE) range(value, 0, 2);
+        if (this == VOIMS_OPT_IN || this == ADVANCED_CALLING_USER) range(value, -1, 1);
+        if (this == NR_ADVANCED_BANDWIDTH) range(value, 0, 1_000_000);
+        if (this == NR_AVAILABILITY) {
+            java.util.Set<String> entries = new java.util.HashSet<>();
+            if (!value.payload().isEmpty()) for (String part : value.payload().split(",")) {
+                if ((!part.equals("1") && !part.equals("2")) || !entries.add(part)) throw new IllegalArgumentException("Invalid NR availability");
+            }
+        }
+        if (this == NR_RSRP) {
+            String[] items = value.payload().split(",");
+            if (items.length != 4) throw new IllegalArgumentException("Four NR thresholds required");
+            int previous = -141;
+            for (String s : items) {
+                int next = Integer.parseInt(s);
+                if (next <= previous || next > -44) throw new IllegalArgumentException("Invalid NR thresholds");
+                previous = next;
+            }
+        }
+        if (this == SIM_COUNTRY && !value.payload().matches("[0-9]{3}")) throw new IllegalArgumentException("Three digit compatibility target required");
+        if (kind == RawValue.Kind.STRING && (value.payload().length() > 512 || value.payload().chars().anyMatch(c -> c < 32))) throw new IllegalArgumentException("Invalid text");
+        if (this == PORTAL_HTTP || this == PORTAL_HTTPS) {
+            java.net.URI uri = java.net.URI.create(value.payload());
+            String scheme = this == PORTAL_HTTP ? "http" : "https";
+            if (!scheme.equals(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null) throw new IllegalArgumentException("Invalid portal endpoint");
+        }
+    }
+    private static void range(RawValue value, int min, int max) {
+        int v = Integer.parseInt(value.payload());
+        if (v < min || v > max) throw new IllegalArgumentException("Value out of range");
+    }
+}
