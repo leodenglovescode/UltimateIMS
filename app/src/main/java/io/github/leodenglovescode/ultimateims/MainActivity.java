@@ -15,11 +15,17 @@ import io.github.leodenglovescode.ultimateims.core.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** 原创只读工作台；配置写入入口在后端和恢复链路验收后才开放。 */
+/** 原创工作台；所有写入均由具备身份验证和恢复日志的控制器执行。 */
 public final class MainActivity extends Activity {
     private final ExecutorService reader = Executors.newSingleThreadExecutor();
     private final int[] pages = {R.string.home, R.string.ims, R.string.diagnostics, R.string.system, R.string.recovery, R.string.settings};
     private LinearLayout body;
+    private Spinner navigation;
+    private FeaturePanels panels;
+    private WorkspaceController workspace;
+    private final BroadcastReceiver statusReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) { render(); }
+    };
     private FrameworkReader.Snapshot snapshot;
     private int page;
     private int selectedSub = -1;
@@ -28,6 +34,14 @@ public final class MainActivity extends Activity {
     private long readGeneration;
     private final Map<Integer, ImsObservation> observations = new HashMap<>();
     private SubscriptionManager.OnSubscriptionsChangedListener subscriptionListener;
+    private CarrierObservation carrierObservation;
+    @android.annotation.TargetApi(34)
+    private final class CarrierObservation {
+        private final android.telephony.CarrierConfigManager manager = getSystemService(android.telephony.CarrierConfigManager.class);
+        private final android.telephony.CarrierConfigManager.CarrierConfigChangeListener listener = (slot, sub, carrier, specificCarrier) -> refresh();
+        void attach() { manager.registerCarrierConfigChangeListener(getMainExecutor(), listener); }
+        void detach() { manager.unregisterCarrierConfigChangeListener(listener); }
+    }
     private final BroadcastReceiver powerReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { refresh(); }
     };
@@ -79,7 +93,12 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        workspace = ((UltimateApplication)getApplication()).workspace();
+        panels = new FeaturePanels(this, workspace, this::render);
+        if (savedInstanceState != null) panels.restoreState(savedInstanceState.getBundle("panels"));
+        page = getIntent().getIntExtra("page",0);
         if (savedInstanceState != null) { page = savedInstanceState.getInt("page"); selectedSub = savedInstanceState.getInt("sim", -1); }
+        page = Math.max(0,Math.min(page,pages.length-1));
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(20), dp(12), dp(20), 0);
         root.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -87,7 +106,7 @@ public final class MainActivity extends Activity {
             v.setPadding(dp(20) + bars.left, dp(12) + bars.top, dp(20) + bars.right, bars.bottom); return insets;
         });
         TextView title = new TextView(this); title.setText(R.string.app_name); title.setTextSize(28); title.setTypeface(null, Typeface.BOLD); root.addView(title);
-        Spinner navigation = new Spinner(this);
+        navigation = new Spinner(this);
         List<String> labels = new ArrayList<>(); for (int id : pages) labels.add(getString(id));
         navigation.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
         navigation.setContentDescription(getString(R.string.app_name)); navigation.setMinimumHeight(dp(48)); root.addView(navigation);
@@ -101,24 +120,35 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onStart() {
         super.onStart(); started = true;
+        registerReceiver(statusReceiver, new IntentFilter(UltimateApplication.STATUS_CHANGED), Context.RECEIVER_NOT_EXPORTED);
         registerReceiver(powerReceiver, new IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), Context.RECEIVER_NOT_EXPORTED);
         subscriptionListener = new SubscriptionManager.OnSubscriptionsChangedListener() {
             @Override public void onSubscriptionsChanged() { refresh(); }
         };
         getSystemService(SubscriptionManager.class).addOnSubscriptionsChangedListener(getMainExecutor(), subscriptionListener);
+        if (Build.VERSION.SDK_INT >= 34) {
+            try { carrierObservation = new CarrierObservation(); carrierObservation.attach(); }
+            catch (SecurityException | UnsupportedOperationException e) { /* 不可订阅时仍支持明确刷新。 */ }
+        }
         refresh();
     }
     @Override protected void onStop() {
         started = false; readGeneration++;
-        unregisterReceiver(powerReceiver);
+        unregisterReceiver(powerReceiver); unregisterReceiver(statusReceiver);
+        if (Build.VERSION.SDK_INT >= 34 && carrierObservation != null) {
+            try { carrierObservation.detach(); } catch (RuntimeException e) { /* 生命周期仍清除当前观测。 */ }
+            carrierObservation = null;
+        }
         getSystemService(SubscriptionManager.class).removeOnSubscriptionsChangedListener(subscriptionListener);
         for (var observation : observations.values()) observation.detach(); observations.clear();
         // 回到前台时重新读取，禁止把离线观测作为当前状态。
         snapshot = null; super.onStop();
     }
-    @Override protected void onDestroy() { reader.shutdownNow(); super.onDestroy(); }
-    @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putInt("page", page); out.putInt("sim", selectedSub); }
+    @Override protected void onDestroy() { reader.shutdownNow(); panels.close(); super.onDestroy(); }
+    @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putInt("page", page); out.putInt("sim", selectedSub); out.putBundle("panels",panels.saveState()); }
     private void refresh() {
+        if (workspace.backend.ready() && !workspace.busy()) workspace.refresh();
+        else workspace.invalidate();
         readGeneration++;
         if (reading || !started) return;
         final long requestedGeneration = readGeneration;
@@ -149,13 +179,18 @@ public final class MainActivity extends Activity {
     }
     private void render() {
         if (body == null || isDestroyed()) return;
-        body.removeAllViews(); text(getString(R.string.foundation), false); heading(pages[page]);
+        body.removeAllViews();  heading(pages[page]);
         if (page == 5) { settings(); return; }
         button(R.string.refresh, this::refresh);
         if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) button(R.string.permission, () -> requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, 1));
-        if (page == 4) { text(getString(R.string.evidence), false); text(getString(R.string.backup_explain), false); return; }
+        if (!workspace.sims().isEmpty() && workspace.selected(selectedSub) == null) selectedSub = workspace.sims().get(0).getInt("sub");
+        panels.attach(body,selectedSub); panels.status();
+        if (page == 1 || page == 4) { privilegedSimSelector(); panels.attach(body,selectedSub); if (page == 1) panels.ims(); else panels.recovery(); return; }
+        if (page == 3) { panels.system(); return; }
+        if (page == 2) { privilegedSimSelector(); panels.attach(body,selectedSub); panels.diagnostics(); }
         text(getString(R.string.backend, backendName()), false);
         text(getString(R.string.device, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT), false);
+        text(getString(R.string.security_patch,Build.VERSION.SECURITY_PATCH),false);
         text(getString(R.string.battery, bool(getSystemService(PowerManager.class).isPowerSaveMode())), false);
         if (snapshot == null) { text(getString(reading ? R.string.loading : R.string.error_read), false); return; }
         if (page == 3) { system(); return; }
@@ -172,14 +207,6 @@ public final class MainActivity extends Activity {
             text(getString(R.string.capabilities, ims == null || ims.capabilities == null ? unknown() : ims.capabilities), false);
             text(getString(R.string.ims_transport, ims == null || ims.transport == null ? unknown() : transport(ims.transport)), false);
             text(getString(R.string.observation_note), false);
-        } else if (page == 1) {
-            text(getString(R.string.read_only), false);
-            if (sim.carrierConfig().isEmpty()) text(getString(R.string.config_unreadable), false);
-            for (var key : ConfigKey.values()) if (key.scope == ConfigKey.Scope.CARRIER) {
-                text(key.platformName, true);
-                Object value = sim.carrierConfig().get(key);
-                text(value == null ? unknown() : FrameworkReader.format(value), false);
-            }
         } else if (page == 2) {
             text(getString(R.string.mask_user, mask(sim.userMask())), false); text(getString(R.string.mask_power, mask(sim.powerMask())), false); text(getString(R.string.mask_carrier, mask(sim.carrierMask())), false);
             int finding = switch (NetworkAssessment.assess(sim.userMask(), sim.powerMask(), sim.carrierMask())) {
@@ -222,12 +249,30 @@ public final class MainActivity extends Activity {
         text(getString(R.string.privacy), false); text(getString(R.string.backend, backendName()), false);
         button(R.string.backend_choose, () -> new AlertDialog.Builder(this).setTitle(R.string.backend_choose)
                 .setItems(new String[]{getString(R.string.shizuku), getString(R.string.adb), getString(R.string.root)}, (d, index) -> {
+                    if (workspace.busy() || workspace.backend.bound()) { Toast.makeText(this,R.string.busy,Toast.LENGTH_LONG).show(); return; }
                     getPreferences(MODE_PRIVATE).edit().putString("selected_backend", BackendSession.Mode.values()[index].name()).apply(); render();
                 }).show());
-        if (!getPreferences(MODE_PRIVATE).getString("selected_backend", "").isEmpty()) text(getString(R.string.backend_unavailable), false);
+        panels.attach(body,selectedSub); panels.settings(chosenBackend());
         button(R.string.language, () -> new AlertDialog.Builder(this).setTitle(R.string.language)
                 .setItems(new String[]{getString(R.string.auto), getString(R.string.english), getString(R.string.chinese)}, (d, index) ->
                     getSystemService(LocaleManager.class).setApplicationLocales(index == 0 ? LocaleList.getEmptyLocaleList() : LocaleList.forLanguageTags(index == 1 ? "en" : "zh-CN"))).show());
+    }
+    BackendSession.Mode chosenBackend() {
+        String chosen = getPreferences(MODE_PRIVATE).getString("selected_backend", "");
+        return chosen.isEmpty() ? null : BackendSession.Mode.valueOf(chosen);
+    }
+    void openImsPage() { page = 1; navigation.setSelection(1); render(); }
+    @Override protected void onActivityResult(int request, int result, Intent data) { super.onActivityResult(request,result,data); panels.fileResult(request,result,data); }
+    private void privilegedSimSelector() {
+        var records = workspace.sims();
+        if (records.isEmpty()) { if (snapshot != null && !snapshot.sims().isEmpty()) simSelector(); return; }
+        Spinner selector = new Spinner(this); List<String> labels = new ArrayList<>(); int selection = 0;
+        for (var sim : records) { if (sim.getInt("sub") == selectedSub) selection = labels.size(); labels.add(getString(R.string.sim,sim.getInt("slot")+1,sim.getString("carrier"),getString(sim.getBoolean("embedded") ? R.string.esim : R.string.physical))); }
+        selector.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels)); selector.setSelection(selection); selector.setMinimumHeight(dp(48)); body.addView(selector);
+        selector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            public void onItemSelected(AdapterView<?> p, View v, int n, long id) { if (selectedSub != records.get(n).getInt("sub")) { selectedSub = records.get(n).getInt("sub"); render(); } }
+            public void onNothingSelected(AdapterView<?> p) { }
+        });
     }
     private String backendName() {
         String value = getPreferences(MODE_PRIVATE).getString("selected_backend", "");

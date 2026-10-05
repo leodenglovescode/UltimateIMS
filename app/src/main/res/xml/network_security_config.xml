@@ -1,0 +1,13 @@
+<network-security-config>
+    <!-- 系统 CA 校验保持有效；只对明确列出的门户候选域开放用户触发的 HTTP 诊断。 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">connectivitycheck.gstatic.com</domain>
+        <domain includeSubdomains="false">captive.v2ex.co</domain>
+        <domain includeSubdomains="false">connect.rom.miui.com</domain>
+        <domain includeSubdomains="false">wifi.vivo.com.cn</domain>
+        <domain includeSubdomains="false">connectivitycheck.platform.hicloud.com</domain>
+    </domain-config>
+</network-security-config>

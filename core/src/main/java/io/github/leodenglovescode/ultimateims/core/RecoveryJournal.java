@@ -6,7 +6,7 @@ import java.util.*;
 
 /** 原值只追加；终态和恢复成功都不删除备份。每次状态变更先持久化再执行写入。 */
 public final class RecoveryJournal {
-    public enum State { PREPARED, APPLYING, VERIFIED, RECOVERY_REQUIRED, RESTORING, RESTORED }
+    public enum State { PREPARED, APPLYING, VERIFIED, RECOVERY_REQUIRED, RESTORING, RESTORED, PARTIALLY_RESTORED }
     public record Entry(SimIdentity identity, State state, Map<ConfigKey, RawValue> originals,
                         Map<ConfigKey, RawValue> target) {
         public Entry {

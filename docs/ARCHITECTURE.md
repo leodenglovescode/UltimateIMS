@@ -2,36 +2,47 @@
 
 ## 独立边界
 
-## 分层
+## 当前分层
 
-1. `app`：原创六页工作台、实时观测、SIM 选择、系统 LocaleManager。当前原生 Android View；使用系统字体缩放、可滚动布局、48dp 交互区、可访问标题。运行字符串全部资源化。
-2. `core`：无 Android 依赖的键值类型、配置约束、SIM 身份、认证会话、串行事务和原值日志。区分 UNKNOWN、UNSET、显式 false / -1 / 空数组。
-3. `framework`（后续独立模块）：集中兼容适配。公共 API 优先，隐藏方法必须逐签名检查参数及返回类型，构建版本并不是唯一依据。不在 UI 散布反射和事务编号。
-4. `transport`（后续独立模块）：官方 Shizuku UserService；独立私有服务；无线 ADB 的官方 TLS/配对库；用户主动批准的已有 root。传输只接收类型化操作，不开放任意命令执行。
-5. `evidence`（后续）：局部诊断报告白名单、脱敏导出、时间与权限来源；历史和当前状态隔离。
+- `app/MainActivity` / `FeaturePanels`：原创六页原生 Android UI、所选 SIM、草稿、差异确认、SAF 文档操作、LocaleManager、可滚动布局与系统字体缩放。技术状态标出读取时间，不从历史填入当前设置。
+- `core`：白名单及校验、UNKNOWN/UNSET/显式值、HMAC 身份、会话认证、原值日志、选择性事务、预设与 APN 范围规则。
+- `WorkspaceController`：应用唯一的串行操作队列，AndroidKeyStore 安装私有 HMAC、noBackup 日志、历史、逐卡执行、恢复、APN 独立日志、ready 时用户选择的 CarrierConfig 重应用。
+- `backend/PlatformMethods` / `PlatformOperations`：集中逐参数与返回类型检查。Android 13 的订阅 setter 返回 int、Android 16 返回 void，实际版本只接受已确认形状，不用猜测事务码。原始 getter 与标准 IMS 用户 setter 分开；用户 setter 保留系统 capability 更新通知。
+- `backend/PrivilegeService`：官方 UserService 与私有 app_process 入口共用第一方窄协议；应用 UID + 256 bit 内存 secret 校验。私有 provider 要求 DUMP、shell/root UID、当前启动 nonce。不接收任意命令/服务名/文件路径。
+- 私有 `:broker`：应用 UID 的非导出绑定服务，认证后处理操作。用户所选后端启动带 UiAutomationConnection 的 broker instrumentation；每次操作检查全局委托占用，短时委托白名单权限，操作后释放。不能与其他客户占用委托时并发写入。
+- `adb` 与第一方 JNI：仅 loopback，独立 TLS/ADB 帧与配对状态机；Conscrypt 提供 TLS/exporter，官方 BoringSSL 提供 SPAKE2/HKDF/AES。Keystore 保存不可导出 RSA 私钥，六位码只在内存且及时清零。
 
-## 写入约束
+## 事务与恢复
 
-SIM 绑定使用安装私钥下的 ICCID HMAC；不使用卡槽、订阅 ID、MCC、运营商名或手机号替代。ICCID 无法读取、掩码或为空时拒绝绑定恢复写入。私钥计划由 Android Keystore 保护并保存在 noBackup 私有存储；**目前尚未接入 Android 身份获取与密钥存储**。
+显式后端 → 认证 → 真实 ICCID 验证 → 读取真实原值 → 同步落盘 PREPARED → APPLYING → 写入/有限等待回读 → 完整集合再核验 → VERIFIED。原值只追加，终态也不删除。raw -1、null、false、空数组与不可读取不同。
 
-任意超时、进程死亡、权限撤销、SIM 变化、回读不一致进入 RECOVERY_REQUIRED，后续新写入被阻止。请求超时不取消设备已经发生的修改，也不并发启动回滚。恢复以原始值逐项写入和完整回读确认，失败不删除备份。原值只追加，终态也保留。
+所有 SIM 是用户选中的活动订阅快照，每卡独立身份和结果；首张出现失败/未知后剩余列为未执行。设备门户使用独立的 -2 设备作用域和安装绑定身份。
 
-当前 `OperationCoordinator` 仅供模拟测试；一个进程内必须仅持有一个实例。实际服务连接前还需全局操作锁、后台超时任务收敛、跨进程委托权限冲突检测。应用自行串行不能证明与其他 Shizuku 客户端无冲突。会话 token 核心校验不是 Binder 认证的替代品。
+超时不取消已发生的设备写入。尚运行的 RPC 禁止第二个请求；超时标记 uncertain，恢复需先收敛。持久日志 PREPARED/APPLYING/RESTORING/RECOVERY_REQUIRED 在重启后仍阻止新配置。选择性恢复不能清除其他字段的不确定状态，完整原值始终保留。恢复过的字段从 desired target 移除，防止 opt-in 重应用复活已恢复字段。
 
-CarrierConfig 的 effective bundle 不能说明某项覆盖是否存在，不能用它备份覆盖层原值。删除覆盖之后，即使 effective value 相同也只能报告“请求完成，删除未确认”；原值和恢复暂停保留。能力不足时允许 selective value restore，不宣传精确 reset。
+SIM 替换、订阅号改变均重新验证 ICCID；卡槽/MCC/MNC/运营商名称不能代替身份。Keystore key 丢失且任一原值/APN备份存在时拒绝生成替代 key。无验证身份的 SIM 不自动写入。
 
-设备级门户事务须使用单独设备作用域，不能错误绑定 SIM。全 SIM 操作为显式选中的活动订阅快照，每张卡独立身份、日志、结果。遇到不确定状态暂停其余写入并列出未执行卡，禁止使用通用 all-SIM 原值。
+CarrierConfig 只能读取合并后的 effective bundle，无法备份其他应用的覆盖层结构。原值恢复核验 effective 值；reset 则保存日志并始终报告删除未验证，自动重应用暂停。真实 raw null 订阅值缺少已验证 unset 恢复方法，开启前拒绝写入，而不是默认 false。支持的 -1 值原样恢复。
 
-## 优先级与验收门槛
+APN 使用另外的 AtomicFile：保存原首选行的非秘密字段及唯一操作 tag，写前 RECOVERY_REQUIRED；仅新增/选择固定审阅 profile，重启后按 tag 找回本应用行。恢复前检查原行未变，选择读回原 ID，并验证本应用行已删除；不删除原行或其他 APN。没有可读取首选 ID 时拒绝开始。
 
-| 阶段 | 目标 | 完成条件 | 当前状态 |
+## 隐私与协议限制
+
+共享诊断用 allowlist，不包含 ICCID/IMSI/号码、IP、位置/小区、配对码、URL 或响应正文。用户显式配置草稿导出包含其输入配置文本，不能当作自动脱敏的诊断。原始应用日志只本地查看，不直接加入分享报告。
+
+ADB 使用自签名证书与共享码认证，不是公有 CA HTTPS。配对密钥绑定 TLS exporter；连接限本机，启动命令严格固定，私有 Binder 附加另验 UID/nonce。不能把收到 CNXN/关闭 shell 流当作服务就绪，必须完成认证后的框架读取。实际 Android 配对、loopback 限制与 Keystore/Conscrypt 协同尚无设备证据。
+
+## 优先级进度
+
+| 阶段 | 目标 | 实现状态 | 验收门槛 |
 |---|---|---|---|
-| P0 | 独立项目、清单、调研、只读 UI、安全核心 | 构建、lint、故障注入测试；未知不造假 | 已实现，验证见 VALIDATION |
-| P1 | Pixel 只读框架签名、SIM 身份、官方 Shizuku 传输 | 读取实际 ICCID 与原始订阅字段，认证测试，委托冲突检测 | 待实现；当前无连接设备 |
-| P2 | 实时草稿、白名单写入、单卡/全卡、历史、恢复 | 备份先落盘；选择性变更；逐卡实际回读；故障恢复 | 核心原型已实现，Android 接入待实现 |
-| P3 | 订阅持久化 VoLTE、VoWiFi 用户偏好与 IMS 维护 | 保留 raw -1/unset；取消后端运行后重启，验证通话 | 调研阶段，不能宣称持久化可用 |
-| P4 | 内置私有服务、官方配对协议、可选 root | 真正 Android 配对；本机认证 TLS；双服务共存验证 | 待实现 |
-| P5 | 门户写入、TikTok 确认、完整网络/显示配置 | 回读设置和行为分开；数值 ISO 保持历史目标且不改 MCC/MNC | 键映射及输入约束已有，设备写入待实现 |
-| P7 | Android 13–17、双卡、重启、语言与可访问验收 | 真机和自动化证据逐行落实，剩余不支持功能准确说明 | 待验收 |
+| P0 | 新项目、清单、API研究、安全核心 | 已实现 | 主机构建/测试/lint |
+| P1 | 官方传输、broker、身份与权限冲突 | 已接入 | Pixel 原始属性与真实委托 |
+| P2 | 草稿、每卡/全卡、历史、恢复 | 已接入 | 真机写后回读、杀进程/断权限恢复 |
+| P3 | 持久 VoLTE、用户偏好、IMS维护 | 已接入 | 断后台、无Wi-Fi重启后真实通话 |
+| P4 | 私有无线 ADB、可选已有root | 已接入，JNI主机通过 | Android实际配对/连接/切换 |
+| P5 | 显示、门户、固定地区实验 | 已接入 | 实际NetworkStack/地区消费/展示 |
+| P6 | 审阅APN、IP opt-in、图块、日志/导出 | 已接入 | APN权限与恢复、实际出口服务 |
+| P7 | Android 13–17、双卡/语言/可访问 | 待真机验收 | DEVICE_ACCEPTANCE 全项证据 |
 
-不把未连接的按钮当作功能完成。当前 UI 仅提供可执行的只读刷新、权限请求、后端选择记录和应用语言功能。已知写入缺口在矩阵保留，不以“高级功能”隐藏。
+首个只读增量与本次设备操作增量都保留提交；后续首先执行只读真机验收，不擅自重启、重置或中断通话。矩阵保留所有范围及平台限制，不用按钮存在证明验收完成。

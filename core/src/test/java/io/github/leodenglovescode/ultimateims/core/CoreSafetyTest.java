@@ -143,4 +143,87 @@ public final class CoreSafetyTest {
     }
     @Test public void powerPolicyOverridesOtherwiseAllowedNr() { assertEquals(NetworkAssessment.Finding.POWER_EXCLUDES_NR, NetworkAssessment.assess(1L<<19,0L,1L<<19)); }
     @Test public void unreadablePolicyStaysUnknown() { assertEquals(NetworkAssessment.Finding.UNKNOWN, NetworkAssessment.assess(1L<<19,null,1L<<19)); }
+    @Test public void selectiveRestoreCannotClearUncertainOtherFields() throws Exception {
+        coordinator.apply(volte());
+        journal.save(journal.read(sim).state(RecoveryJournal.State.RECOVERY_REQUIRED));
+        assertEquals(RecoveryJournal.State.RECOVERY_REQUIRED, coordinator.restoreSelected(request(Map.of(),false),Set.of(ConfigKey.VOIMS_OPT_IN)));
+        assertThrows(IllegalStateException.class, () -> coordinator.apply(volte()));
+        assertEquals(2,journal.read(sim).originals().size());
+    }
+    @Test public void selectedRestoreKeepsOtherDesiredTargets() throws Exception {
+        coordinator.apply(volte());
+        coordinator.restoreSelected(request(Map.of(),false),Set.of(ConfigKey.VOIMS_OPT_IN));
+        assertFalse(journal.read(sim).target().containsKey(ConfigKey.VOIMS_OPT_IN));
+        assertTrue(journal.read(sim).target().containsKey(ConfigKey.ADVANCED_CALLING_USER));
+        assertEquals(2,journal.read(sim).originals().size());
+    }
+    @Test public void independentDraftsPreserveDesiredConfiguration() throws Exception {
+        coordinator.apply(request(Map.of(ConfigKey.VOLTE,RawValue.bool(true)),false));
+        coordinator.apply(request(Map.of(ConfigKey.VOWIFI,RawValue.bool(true)),false));
+        assertEquals(2,journal.read(sim).target().size()); assertEquals(2,backend.writes);
+    }
+    @Test public void deviceScopeCannotUseSubscriptionScope() {
+        assertThrows(IllegalArgumentException.class, () -> coordinator.apply(request(Map.of(ConfigKey.PORTAL_HTTP,RawValue.string("http://example.com/generate_204")),false)));
+        assertEquals(0,backend.writes);
+    }
+    @Test public void portalUnsetIsRestorableInDeviceScope() throws Exception {
+        var req = new OperationCoordinator.Request(12345,BackendSession.Mode.SHIZUKU,session.token(),sim,-2,37,Map.of(ConfigKey.PORTAL_HTTP,RawValue.string("http://example.com/generate_204")),false);
+        coordinator.apply(req); coordinator.restore(req); assertEquals(RawValue.unset(),backend.values.get(ConfigKey.PORTAL_HTTP));
+    }
+    @Test public void wfcPreferenceHasThreeModesAndPreservesMinusOne() {
+        for (int mode : List.of(-1,0,1,2)) ConfigKey.WFC_USER_MODE.validate(RawValue.integer(mode),33);
+        assertThrows(IllegalArgumentException.class, () -> ConfigKey.WFC_USER_MODE.validate(RawValue.integer(3),33));
+    }
+    @Test public void signalDomainsAreDistinct() {
+        ConfigKey.NR_RSRQ.validate(RawValue.integers(List.of(-43,-20,0,20)),33);
+        ConfigKey.NR_SINR.validate(RawValue.integers(List.of(-23,0,20,40)),33);
+        assertThrows(IllegalArgumentException.class, () -> ConfigKey.NR_RSRQ.validate(RawValue.integers(List.of(-44,-20,0,20)),33));
+        assertThrows(IllegalArgumentException.class, () -> ConfigKey.NR_SINR.validate(RawValue.integers(List.of(-23,0,20,41)),33));
+    }
+    @Test public void presetsDoNotSilentlyChangeRegionOrPersistentOptIn() {
+        for (int api : List.of(33,34,37)) for (var preset : Presets.Name.values()) {
+            var values = Presets.build(preset,api); for (var entry : values.entrySet()) entry.getKey().validate(entry.getValue(),api);
+            assertFalse(values.containsKey(ConfigKey.SIM_COUNTRY)); assertFalse(values.containsKey(ConfigKey.VOIMS_OPT_IN)); assertFalse(values.containsKey(ConfigKey.WFC_USER));
+        }
+    }
+    @Test public void reviewedApnMatchesOnlyVerifiedCarrier() {
+        assertEquals("fast.t-mobile.com",ApnProfile.reviewed("TMOBILE","310260").apn());
+        assertEquals("cmnet",ApnProfile.reviewed("CMNET","46000").apn());
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.reviewed("CMNET","310260"));
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.reviewed("TMOBILE","46000"));
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.reviewed("CMNET",""));
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.reviewed("ARBITRARY","46000"));
+    }
+    @Test public void apnOperationTagCannotInjectProviderSelection() {
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.ownedName("' OR 1=1"));
+        assertTrue(ApnProfile.ownedName("12345678-1234-1234-1234-123456789abc").startsWith("UltimateIMS "));
+    }
+    @Test public void iconMappingDoesNotInventModemCapability() {
+        ConfigKey.NR_ICON.validate(RawValue.string("connected_mmwave:5G_Plus,connected:5G"),33);
+        assertThrows(IllegalArgumentException.class, () -> ConfigKey.NR_ICON.validate(RawValue.string("connected:5GA"),33));
+        assertThrows(IllegalArgumentException.class, () -> ConfigKey.NR_ICON.validate(RawValue.string("connected:5G,connected:None"),33));
+    }
+    @Test public void apnGroupIsStablePositiveAndBoundToReviewedTag() {
+        String tag = "12345678-1234-1234-1234-123456789abc";
+        assertTrue(ApnProfile.ownedSetId(tag) > 0); assertEquals(ApnProfile.ownedSetId(tag),ApnProfile.ownedSetId(tag));
+        assertNotEquals(ApnProfile.ownedSetId(tag),ApnProfile.ownedSetId("12345678-1234-1234-1234-123456789abd"));
+        assertThrows(IllegalArgumentException.class, () -> ApnProfile.ownedSetId("unverified"));
+    }
+    @Test public void radioObservationRequiresRegistrationRatherThanIcon() {
+        assertEquals(RadioObservation.State.UNKNOWN,RadioObservation.classify(null,20,true));
+        assertEquals(RadioObservation.State.NOT_REGISTERED,RadioObservation.classify(false,20,true));
+        assertEquals(RadioObservation.State.NR_SA,RadioObservation.classify(true,20,null));
+        assertEquals(RadioObservation.State.NR_NSA,RadioObservation.classify(true,13,true));
+        assertEquals(RadioObservation.State.UNKNOWN,RadioObservation.classify(true,13,null));
+        assertEquals(RadioObservation.State.OTHER_REGISTERED,RadioObservation.classify(true,13,false));
+    }
+    @Test public void emptyResetBackupCannotClaimSuccessfulRestore() throws Exception {
+        journal.save(new RecoveryJournal.Entry(sim,RecoveryJournal.State.RECOVERY_REQUIRED,Map.of(),Map.of()));
+        assertThrows(IllegalStateException.class, () -> coordinator.restore(request(Map.of(),false)));
+        assertTrue(journal.read(sim).requiresRecovery()); assertEquals(0,backend.writes);
+    }
+    @Test public void httpProbePolicyCannotBroadenToArbitraryOrSubdomainHosts() {
+        assertTrue(ProbePolicy.allowsHttp("captive.v2ex.co")); assertTrue(ProbePolicy.allowsHttp("CONNECTIVITYCHECK.GSTATIC.COM"));
+        assertFalse(ProbePolicy.allowsHttp("arbitrary.example")); assertFalse(ProbePolicy.allowsHttp("evil.captive.v2ex.co")); assertFalse(ProbePolicy.allowsHttp("captive.v2ex.co.evil.example")); assertFalse(ProbePolicy.allowsHttp(null));
+    }
 }

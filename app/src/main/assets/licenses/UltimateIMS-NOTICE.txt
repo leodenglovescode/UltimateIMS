@@ -1,0 +1,14 @@
+UltimateIMS
+Copyright 2026 leodenglovescode
+
+本项目第一方实现独立编写，不继承参考 IMS 项目的代码或资源。
+发行物包含以下标准运行时依赖：
+Shizuku API / provider / aidl / shared 13.1.5, RikkaW, MIT
+HiddenApiBypass 6.1, LSPosed contributors, Apache-2.0
+Conscrypt Android 2.7.0, The Android Open Source Project / Google contributors, Apache-2.0
+AndroidX Annotation 1.3.0, The Android Open Source Project, Apache-2.0
+BoringSSL AOSP ecc1358826150d6a1851c517c325b0e6c0e1b8be, OpenSSL / Google contributors,
+OpenSSL / SSLeay / ISC and file-specific licenses.
+
+完整许可证与第三方通知位于 third_party/licenses，并随 APK 包含在 assets/licenses。
+BoringSSL 的第三方许可保持官方 LICENSE 原文；Conscrypt 的 NOTICE 保持原文。

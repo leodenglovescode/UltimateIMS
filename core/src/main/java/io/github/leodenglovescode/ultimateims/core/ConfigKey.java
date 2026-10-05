@@ -14,16 +14,32 @@ public enum ConfigKey {
     UT("carrier_supports_ss_over_ut_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     NR_AVAILABILITY("carrier_nr_availabilities_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
     NR_RSRP("5g_nr_ssrsrp_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_RSRQ("5g_nr_ssrsrq_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_SINR("5g_nr_sssinr_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_ICON("5g_icon_configuration_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
     NR_ADVANCED_BANDWIDTH("nr_advanced_threshold_bandwidth_khz_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    LTE_PLUS_BANDWIDTH("lte_plus_threshold_bandwidth_khz_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
     LTE("lte_enabled_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     HIDE_LTE_PLUS("hide_lte_plus_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     SHOW_4G("show_4g_for_lte_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    SHOW_4G_LTE("show_4glte_for_lte_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    EDITABLE_LTE("editable_enhanced_4g_lte_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    HIDE_LTE_SETTING("hide_enhanced_4g_lte_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    EDITABLE_WFC("editable_wfc_mode_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
+    EDITABLE_WFC_ROAMING("editable_wfc_roaming_mode_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     CARRIER_NAME("carrier_name_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
     CARRIER_NAME_OVERRIDE("carrier_name_override_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     IMS_USER_AGENT("ims.ims_user_agent_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
     SIM_COUNTRY("sim_country_iso_override_string", RawValue.Kind.STRING, 34, Scope.CARRIER),
     VOIMS_OPT_IN("voims_opt_in_status", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
     ADVANCED_CALLING_USER("volte_vt_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    WFC_USER("wfc_ims_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    WFC_USER_MODE("wfc_ims_mode", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    WFC_USER_ROAMING_MODE("wfc_ims_roaming_mode", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    WFC_USER_ROAMING("wfc_ims_roaming_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    VT_USER("vt_ims_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    CROSS_SIM_USER("cross_sim_calling_enabled", RawValue.Kind.INTEGER, 33, Scope.SUBSCRIPTION),
+    VONR_USER("nr_advanced_calling_enabled", RawValue.Kind.INTEGER, 34, Scope.SUBSCRIPTION),
     PORTAL_HTTP("captive_portal_http_url", RawValue.Kind.STRING, 33, Scope.DEVICE),
     PORTAL_HTTPS("captive_portal_https_url", RawValue.Kind.STRING, 33, Scope.DEVICE);
 
@@ -40,22 +56,33 @@ public enum ConfigKey {
         if (value.kind() == RawValue.Kind.UNSET) return;
         if (value.kind() != kind) throw new IllegalArgumentException("Invalid value type");
         if (this == WFC_MODE || this == WFC_ROAMING_MODE) range(value, 0, 2);
-        if (this == VOIMS_OPT_IN || this == ADVANCED_CALLING_USER) range(value, -1, 1);
-        if (this == NR_ADVANCED_BANDWIDTH) range(value, 0, 1_000_000);
+        if (this == WFC_USER_MODE || this == WFC_USER_ROAMING_MODE) range(value, -1, 2);
+        else if (scope == Scope.SUBSCRIPTION) range(value, -1, 1);
+        if (this == NR_ADVANCED_BANDWIDTH || this == LTE_PLUS_BANDWIDTH) range(value, 0, 1_000_000);
         if (this == NR_AVAILABILITY) {
             java.util.Set<String> entries = new java.util.HashSet<>();
             if (!value.payload().isEmpty()) for (String part : value.payload().split(",")) {
                 if ((!part.equals("1") && !part.equals("2")) || !entries.add(part)) throw new IllegalArgumentException("Invalid NR availability");
             }
         }
-        if (this == NR_RSRP) {
+        if (this == NR_RSRP || this == NR_RSRQ || this == NR_SINR) {
             String[] items = value.payload().split(",");
             if (items.length != 4) throw new IllegalArgumentException("Four NR thresholds required");
-            int previous = -141;
+            int min = this == NR_RSRP ? -140 : this == NR_RSRQ ? -43 : -23;
+            int max = this == NR_RSRP ? -44 : this == NR_RSRQ ? 20 : 40;
+            int previous = min - 1;
             for (String s : items) {
                 int next = Integer.parseInt(s);
-                if (next <= previous || next > -44) throw new IllegalArgumentException("Invalid NR thresholds");
+                if (next <= previous || next > max) throw new IllegalArgumentException("Invalid NR thresholds");
                 previous = next;
+            }
+        }
+        if (this == NR_ICON && !value.payload().isEmpty()) {
+            java.util.Set<String> scenarios = java.util.Set.of("connected_mmwave","connected","connected_rrc_idle","not_restricted_rrc_idle","not_restricted_rrc_con","restricted");
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (String pair : value.payload().split(",",-1)) {
+                String[] fields = pair.split(":",-1);
+                if (fields.length != 2 || !scenarios.contains(fields[0]) || !seen.add(fields[0]) || !java.util.Set.of("5G_Plus","5G","None").contains(fields[1])) throw new IllegalArgumentException("Invalid 5G display mapping");
             }
         }
         if (this == SIM_COUNTRY && !value.payload().matches("[0-9]{3}")) throw new IllegalArgumentException("Three digit compatibility target required");
