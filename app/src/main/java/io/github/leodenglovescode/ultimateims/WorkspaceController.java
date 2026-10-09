@@ -46,7 +46,8 @@ public final class WorkspaceController {
     public void backendChanged() {
         if (!backend.ready()) { current = null; notifyChanged(); return; }
         if (!busy) task("Reading privileged live values", () -> {
-            refreshNow();
+            Bundle firstRead = backend.takeInitialSnapshot();
+            if (firstRead != null) current = firstRead; else refreshNow();
             if (preferences().getBoolean("auto_restore", false)) autoRestore();
         });
     }

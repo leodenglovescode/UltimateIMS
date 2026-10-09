@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">UltimateIMS</string>
-    <string name="home">设备与 SIM</string>
-    <string name="ims">IMS 配置</string>
+    <string name="home">IMS 与无线</string>
+    <string name="ims">配置</string>
     <string name="diagnostics">连接诊断</string>
     <string name="system">系统网络</string>
     <string name="recovery">恢复与证据</string>
@@ -19,12 +19,8 @@
     <string name="default_data">默认数据 SIM：%1$s</string>
     <string name="sim_country">报告的 SIM 地区：%1$s</string>
     <string name="rat">报告的数据网络类型：%1$s</string>
-    <string name="ims_registration">IMS 注册：%1$s</string>
     <string name="registered">已注册</string>
-    <string name="registering">注册中</string>
     <string name="not_registered">未注册</string>
-    <string name="capabilities">IMS 语音 / 视频 / UT 能力：%1$s</string>
-    <string name="ims_transport">IMS 传输：%1$s</string>
     <string name="wifi">Wi-Fi</string>
     <string name="cellular">蜂窝</string>
     <string name="power_nr">电源策略排除了 NR。即使用户和运营商允许 5G，省电模式也可能导致此情况。请自行检查省电模式；UltimateIMS 不修改电源策略。</string>
@@ -54,7 +50,6 @@
     <string name="error_read">状态读取失败；值保持未知。</string>
     <string name="yes">是</string>
     <string name="no">否</string>
-    <string name="reading">需要权限或尚未收到回调</string>
     <string name="observation_note">数据制式、IMS 注册、能力和显示图标属于不同观测。本版本不能确定正在进行的语音通话使用何种无线技术。</string>
     <string name="backend_start">启动已选后端</string>
     <string name="backend_stop">停止后端</string>
@@ -120,7 +115,7 @@
     <string name="key_wfc_roaming_mode">默认漫游通话偏好</string>
     <string name="key_wfc_roaming">默认漫游 Wi-Fi 通话</string>
     <string name="key_vt">运营商视频通话可用性</string>
-    <string name="key_vonr">运营商 VoNR 可用性</string>
+    <string name="key_vonr">VoNR / Vo5G 可用性</string>
     <string name="key_cross_sim">运营商跨 SIM 通话可用性</string>
     <string name="key_ut">UT 补充服务可用性</string>
     <string name="key_nr_availability">NR 可用性：1 NSA，2 SA</string>
@@ -172,23 +167,18 @@
     <string name="nr_nsa_observed">已观测 LTE 分组注册及已连接的次级 NR，提示 NSA；图标展示仍是独立观测。</string>
     <string name="nr_registration_unknown">当前观测无法确认 NR 注册，或尚未注册 NR；仅凭 5G 图标或开启设置无法证明。</string>
     <string name="local_network_explain">Android 17 通过系统权限限制本地网络。请明确授权后再次点击配对或连接。UltimateIMS 私有 ADB 仅连接 127.0.0.1，不扫描局域网设备。授予权限本身不会配对或启动后端。</string>
-    <string name="nav_home">状态</string>
-    <string name="nav_ims">通话</string>
+    <string name="nav_home">IMS 与无线</string>
+    <string name="nav_ims">配置</string>
     <string name="nav_diagnostics">诊断</string>
     <string name="nav_network">网络</string>
     <string name="nav_tools">工具</string>
-    <string name="intro_home">查看设备与 SIM 状态。未知表示当前无法读取，不代表功能已关闭。</string>
-    <string name="intro_ims">选择 SIM、编辑草稿，再审阅并应用。编辑本身不会修改手机配置。</string>
+    <string name="intro_home">查看所选 SIM 的 IMS 注册、5G 语音（VoNR）及 LTE/5G 无线配置。</string>
+    <string name="intro_ims">在此连接明确选择的后端，再配置 Wi-Fi 通话、偏好和高级选项。</string>
     <string name="intro_diagnostics">查看注册与连接证据。配置开关和图标不等同于实际连接。</string>
     <string name="intro_network">审阅系统连接检查端点。此处修改影响所有 SIM 和 Wi-Fi。</string>
     <string name="intro_tools">持久化 VoLTE、原值恢复及高级维护。继续前请审阅每项操作。</string>
-    <string name="intro_settings">调整显示偏好，并明确选择后端连接方式。</string>
+    <string name="intro_settings">系统外观、语言、隐私及应用信息。</string>
     <string name="appearance">外观与语言</string>
-    <string name="theme_choose">选择主题</string>
-    <string name="theme_system">跟随系统</string>
-    <string name="theme_light">浅色</string>
-    <string name="theme_dark">深色</string>
-    <string name="theme_current">主题：%1$s</string>
     <string name="dynamic_color">使用壁纸配色</string>
     <string name="dynamic_color_explain">可选的 Material You 壁纸配色，支持浅色和深色主题。</string>
     <string name="device_section">设备概览</string>
@@ -208,8 +198,6 @@
     <string name="group_5g">5G 无线配置</string>
     <string name="group_display">网络标签与图标</string>
     <string name="group_advanced">运营商与高级设置</string>
-    <string name="expanded">已展开</string>
-    <string name="collapsed">已折叠</string>
     <string name="change_action">草稿操作</string>
     <string name="new_value">新值</string>
     <string name="array_hint">输入以逗号分隔的数字。保存前将验证修改。</string>
@@ -247,6 +235,14 @@
     <string name="policy_section">为什么 5G 不可用？</string>
     <string name="connection_ready">连接就绪 · 可读取实时值</string>
     <string name="connection_not_ready">读取或应用这些设置需要特权连接。</string>
-    <string name="connect_settings">设置连接</string>
+    <string name="connect_settings">打开配置与后端</string>
     <string name="nav_settings">设置</string>
+    <string name="radio_controls">通话与无线配置</string>
+    <string name="nr_nsa_toggle">5G NSA</string>
+    <string name="nr_sa_toggle">5G SA</string>
+    <string name="toggle_draft_note">开关用于准备修改。审阅后再应用；开关不证明注册成功或 VoNR 通话可用。</string>
+    <string name="choose_toggle">明确选择启用或禁用</string>
+    <string name="theme_system_automatic">主题在启动时及系统外观变化时自动跟随系统。</string>
+    <string name="array_empty">无条目</string>
+    <string name="preference_default">运营商默认（-1）</string>
 </resources>

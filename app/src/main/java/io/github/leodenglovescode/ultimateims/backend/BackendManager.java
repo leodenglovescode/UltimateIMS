@@ -15,84 +15,148 @@ public final class BackendManager {
     private final ExecutorService rpc = Executors.newSingleThreadExecutor();
     private final ExecutorService setup = Executors.newSingleThreadExecutor();
     private final IBinder clientLife = new Binder();
+    private final Handler main = new Handler(Looper.getMainLooper());
     private byte[] secret = new byte[32];
     private IBrokerChannel broker;
     private volatile IPrivilegedChannel channel;
     private volatile IPrivilegedChannel failedChannel;
     private volatile boolean bound, transitioning, authenticatedRead;
+    private volatile Bundle initialSnapshot;
+    private volatile boolean initializing, officialBinding;
     private volatile long epoch;
     private volatile Future<?> pending;
     private volatile boolean uncertain;
     private volatile String state = "Backend not started";
     private BackendSession.Mode mode;
     private String launchNonce;
-    private boolean permissionRequested;
+    private volatile boolean permissionRequested;
+    private int permissionRequestCode;
+    private long permissionEpoch;
     private Shizuku.UserServiceArgs serviceArgs;
     public BackendManager(Context context, Listener listener) {
         this.context = context.getApplicationContext(); this.listener = listener;
         new SecureRandom().nextBytes(secret);
         Shizuku.addRequestPermissionResultListener((request, granted) -> {
-            if (request == 910 && permissionRequested) { permissionRequested = false; if (granted == android.content.pm.PackageManager.PERMISSION_GRANTED) bindOfficial(); else update("Shizuku permission denied"); }
+            if (request != permissionRequestCode || !permissionRequested || permissionEpoch != epoch || mode != BackendSession.Mode.SHIZUKU) return;
+            permissionRequested = false;
+            if (granted == android.content.pm.PackageManager.PERMISSION_GRANTED) bindBroker();
+            else update("Shizuku permission denied; grant access explicitly in Shizuku before retrying");
         });
-        Shizuku.addBinderDeadListener(() -> { if (mode == BackendSession.Mode.SHIZUKU) { channel = null; update("Official backend disconnected"); } });
+        Shizuku.addBinderDeadListener(() -> {
+            if (mode == BackendSession.Mode.SHIZUKU) { authenticatedRead = false; initialSnapshot = null; permissionRequested = false; officialBinding = false; channel = null; update("Official backend disconnected; stop the session before retrying"); }
+        });
     }
     public BackendSession.Mode mode() { return mode; }
     public String state() { return state; }
     public byte[] token() { return secret.clone(); }
     public boolean ready() { return authenticatedRead && channel != null && channel.asBinder().isBinderAlive() && !uncertain; }
-    public boolean bound() { return bound || transitioning; }
+    public boolean bound() { return bound || transitioning || permissionRequested || failedChannel != null; }
+    public synchronized Bundle takeInitialSnapshot() {
+        if (!ready()) return null; Bundle result = initialSnapshot; initialSnapshot = null; return result == null ? null : result.deepCopy();
+    }
     public boolean inFlight() { return pending != null && !pending.isDone(); }
     public void reconcile() { if (inFlight()) throw new IllegalStateException("An uncertain remote operation is still running"); uncertain = false; }
-    private void update(String message) { state = message; new Handler(Looper.getMainLooper()).post(listener::changed); }
+    private void update(String message) { state = message; main.post(listener::changed); }
     private final ServiceConnection brokerConnection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) { if (!bound || transitioning) return; broker = IBrokerChannel.Stub.asInterface(service); startChosenTransport(); }
-        @Override public void onServiceDisconnected(ComponentName name) { if (broker != null && broker.asBinder().isBinderAlive()) return; authenticatedRead = false; broker = null; channel = null; update("Broker disconnected; recovery may be required"); }
+        @Override public void onServiceDisconnected(ComponentName name) { if (broker != null && broker.asBinder().isBinderAlive()) return; authenticatedRead = false; initialSnapshot = null; broker = null; channel = null; update("Broker disconnected; recovery may be required"); }
     };
     private final ServiceConnection officialConnection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) { if (bound && !transitioning && mode == BackendSession.Mode.SHIZUKU) initialize(IPrivilegedChannel.Stub.asInterface(service)); }
-        @Override public void onServiceDisconnected(ComponentName name) { if (channel != null && channel.asBinder().isBinderAlive()) return; authenticatedRead = false; channel = null; update("Official backend disconnected"); }
+        @Override public void onServiceDisconnected(ComponentName name) { if (channel != null && channel.asBinder().isBinderAlive()) return; authenticatedRead = false; initialSnapshot = null; channel = null; update("Official backend disconnected"); }
     };
     public void start(BackendSession.Mode selected) {
         if (selected == null || inFlight() || channel != null || bound()) throw new IllegalStateException("Stop the current backend before starting another");
-        epoch++; authenticatedRead = false; mode = selected; launchNonce = null; new SecureRandom().nextBytes(secret);
+        epoch++; uncertain = false; pending = null; authenticatedRead = false; initialSnapshot = null; mode = selected; launchNonce = null; new SecureRandom().nextBytes(secret);
+        try {
+        if (selected == BackendSession.Mode.SHIZUKU) {
+            if (!Shizuku.pingBinder()) { update("Shizuku is not running; start it explicitly in Shizuku, then retry"); return; }
+            if (Shizuku.isPreV11()) { update("Shizuku API version is unsupported; update official Shizuku"); return; }
+            if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (Shizuku.shouldShowRequestPermissionRationale()) { update("Shizuku permission was denied; review authorization in Shizuku"); return; }
+                permissionRequested = true; permissionEpoch = epoch; permissionRequestCode = 910 + (int)(epoch % 60000);
+                update("Waiting for explicit Shizuku authorization");
+                try { Shizuku.requestPermission(permissionRequestCode); }
+                catch (RuntimeException e) { permissionRequested = false; update("Shizuku permission request failed: " + PlatformMethods.failure(e)); }
+                return;
+            }
+        }
+        } catch (RuntimeException error) {
+            permissionRequested = false; update("Shizuku preflight failed: " + PlatformMethods.failure(error)); return;
+        }
+        bindBroker();
+    }
+    private void bindBroker() {
+        if (bound || transitioning) return;
         update("Preparing selected backend");
-        bound = context.bindService(new Intent(context, BrokerService.class), brokerConnection, Context.BIND_AUTO_CREATE);
-        if (!bound) update("Broker binding failed");
+        try { bound = context.bindService(new Intent(context,BrokerService.class),brokerConnection,Context.BIND_AUTO_CREATE); }
+        catch (RuntimeException e) { bound = false; update("Broker binding failed: " + PlatformMethods.failure(e)); return; }
+        if (!bound) update("Broker binding failed; retry explicitly");
     }
     private void startChosenTransport() {
         if (mode == BackendSession.Mode.SHIZUKU) {
-            if (!Shizuku.pingBinder()) { update("Shizuku is not running; start it explicitly in Shizuku"); return; }
-            if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) { permissionRequested = true; Shizuku.requestPermission(910); }
-            else bindOfficial();
+            boolean authorized;
+            try { authorized = Shizuku.pingBinder() && Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED; }
+            catch (RuntimeException error) { authorized = false; }
+            if (!authorized) {
+                try { context.unbindService(brokerConnection); } catch (IllegalArgumentException e) { /* 清理未进入认证阶段的本地绑定。 */ }
+                bound = false; broker = null; update("Shizuku authorization unavailable; retry explicitly"); return;
+            }
+            bindOfficial();
         } else {
             launchNonce = java.util.UUID.randomUUID().toString();
-            if (mode == BackendSession.Mode.EXISTING_ROOT) setup.execute(() -> {
-                try { new ProcessBuilder("su", "-c", launchCommand()).start(); update("Existing-root start requested; waiting for authenticated attachment"); }
-                catch (Exception e) { update("Root startup failed: " + e.getClass().getSimpleName()); }
-            });
+            if (mode == BackendSession.Mode.EXISTING_ROOT) {
+                final long requestedEpoch = epoch; final String command = launchCommand();
+                update("Existing-root start requested; waiting for authenticated attachment");
+                setup.execute(() -> {
+                    try { if (requestedEpoch == epoch && bound && !transitioning) new ProcessBuilder("su","-c",command).start(); }
+                    catch (Exception e) { if (requestedEpoch == epoch) update("Root startup failed: " + e.getClass().getSimpleName()); }
+                });
+            }
             else update("Wireless ADB selected; pair/connect explicitly to start the private backend");
         }
     }
     private void bindOfficial() {
+        if (officialBinding || initializing || channel != null || broker == null || !bound || transitioning) return;
+        officialBinding = true;
         serviceArgs = new Shizuku.UserServiceArgs(new ComponentName(context, PrivilegeService.class)).tag("ultimateims-official").daemon(false).processNameSuffix("uims").version(io.github.leodenglovescode.ultimateims.BuildConfig.VERSION_CODE);
         try { Shizuku.bindUserService(serviceArgs, officialConnection); }
-        catch (RuntimeException e) { update("Shizuku binding failed: " + e.getClass().getSimpleName()); }
+        catch (RuntimeException e) { officialBinding = false; update("Shizuku binding failed: " + e.getClass().getSimpleName()); }
     }
-    private void initialize(IPrivilegedChannel candidate) {
+    private synchronized void initialize(IPrivilegedChannel candidate) {
+        if (initializing || channel != null) return;
+        initializing = true; officialBinding = false;
         long requestedEpoch = epoch; BackendSession.Mode selectedMode = mode;
         setup.execute(() -> {
             try {
                 if (requestedEpoch != epoch || !bound || transitioning) return;
-                candidate.initialize(android.os.Process.myUid(), selectedMode.ordinal(), secret, broker, clientLife);
+                initializeRemote(candidate,selectedMode);
                 if (requestedEpoch != epoch || transitioning) { failedChannel = candidate; return; }
-                candidate.asBinder().linkToDeath(() -> { if (channel == candidate) { authenticatedRead = false; channel = null; update("Privileged backend died; recovery may be required"); } }, 0);
+                candidate.asBinder().linkToDeath(() -> { if (channel == candidate) { authenticatedRead = false; initialSnapshot = null; channel = null; update("Privileged backend died; recovery may be required"); } }, 0);
                 channel = candidate;
                 Bundle result = invoke(Protocol.SNAPSHOT, new Bundle());
                 if (!result.getBoolean("ok")) throw new IllegalStateException("Initial authenticated read failed");
                 if (requestedEpoch != epoch || transitioning) { failedChannel = candidate; channel = null; return; }
-                authenticatedRead = true; update("Selected backend ready and authenticated");
-            } catch (Exception e) { authenticatedRead = false; failedChannel = candidate; channel = null; update("Backend preparation failed: " + PlatformMethods.failure(e)); }
+                if (selectedMode == BackendSession.Mode.SHIZUKU && !Shizuku.pingBinder()) throw new IllegalStateException("Shizuku disconnected during authentication");
+                initialSnapshot = result.deepCopy(); authenticatedRead = true; update("Selected backend ready and authenticated");
+            } catch (Exception e) {
+                failedChannel = candidate;
+                if (requestedEpoch == epoch) { authenticatedRead = false; initialSnapshot = null; channel = null; update("Backend preparation failed: " + PlatformMethods.failure(e)); }
+            } finally { initializing = false; }
         });
+    }
+    private synchronized void initializeRemote(IPrivilegedChannel candidate, BackendSession.Mode selectedMode) throws Exception {
+        if (inFlight()) throw new IllegalStateException("Another remote operation is still running");
+        final byte[] token = secret.clone(); final IBrokerChannel selectedBroker = broker;
+        final long requestEpoch = epoch;
+        Future<?> request = rpc.submit(() -> {
+            try { candidate.initialize(android.os.Process.myUid(),selectedMode.ordinal(),token,selectedBroker,clientLife); return null; }
+            finally { signalConvergence(requestEpoch); }
+        });
+        pending = request;
+        try { request.get(20,TimeUnit.SECONDS); }
+        catch (TimeoutException error) { uncertain = true; update("Authentication timeout; remote result unknown, wait for convergence before explicit stop"); throw error; }
+        finally { if (request.isDone()) pending = null; }
     }
     public synchronized boolean attach(String nonce, IBinder service, int callerUid) {
         if (mode == null || mode == BackendSession.Mode.SHIZUKU || launchNonce == null || !launchNonce.equals(nonce) || service == null) return false;
@@ -109,7 +173,8 @@ public final class BackendManager {
     public synchronized Bundle invoke(int operation, Bundle args) throws Exception {
         if (channel == null || uncertain || inFlight()) throw new IllegalStateException("Backend unavailable or previous result unknown");
         IPrivilegedChannel selected = channel; byte[] token = secret.clone();
-        Future<Bundle> request = rpc.submit(() -> selected.invoke(token, operation, args)); pending = request;
+        final long requestEpoch = epoch;
+        Future<Bundle> request = rpc.submit(() -> { try { return selected.invoke(token,operation,args); } finally { signalConvergence(requestEpoch); } }); pending = request;
         try {
             Bundle result = request.get(20, TimeUnit.SECONDS);
             if (result == null) throw new IllegalStateException("Backend returned no result");
@@ -117,6 +182,10 @@ public final class BackendManager {
         } catch (TimeoutException e) {
             uncertain = true; update("Remote timeout; result unknown, recovery required"); throw e;
         } finally { if (request.isDone()) pending = null; }
+    }
+    private void signalConvergence(long requestEpoch) {
+        // 只刷新不确定操作的 UI；保持“未知”并要求明确恢复，不重试写入。
+        if (uncertain) main.postDelayed(() -> { if (requestEpoch == epoch && uncertain && !inFlight()) listener.changed(); },50);
     }
     private void terminate(IPrivilegedChannel service) throws Exception {
         if (service == null || !service.asBinder().isBinderAlive()) return;
@@ -126,7 +195,7 @@ public final class BackendManager {
     }
     public void stop() {
         if (inFlight() || transitioning) throw new IllegalStateException("A remote operation is still running");
-        epoch++; authenticatedRead = false; transitioning = true; permissionRequested = false; launchNonce = null;
+        epoch++; authenticatedRead = false; initialSnapshot = null; officialBinding = false; transitioning = true; permissionRequested = false; launchNonce = null;
         setup.execute(() -> {
             IPrivilegedChannel oldChannel = channel, oldFailed = failedChannel;
             boolean hadChannel = oldChannel != null || oldFailed != null;

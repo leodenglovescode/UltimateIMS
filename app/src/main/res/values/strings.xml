@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">UltimateIMS</string>
-    <string name="home">Device &amp; SIMs</string>
-    <string name="ims">IMS configuration</string>
+    <string name="home">IMS &amp; radio</string>
+    <string name="ims">Configuration</string>
     <string name="diagnostics">Connectivity diagnostics</string>
     <string name="system">System network</string>
     <string name="recovery">Recovery &amp; evidence</string>
@@ -19,12 +19,8 @@
     <string name="default_data">Default data SIM: %1$s</string>
     <string name="sim_country">Reported SIM region: %1$s</string>
     <string name="rat">Reported data network type: %1$s</string>
-    <string name="ims_registration">IMS registration: %1$s</string>
     <string name="registered">Registered</string>
-    <string name="registering">Registering</string>
     <string name="not_registered">Not registered</string>
-    <string name="capabilities">IMS voice / video / UT capabilities: %1$s</string>
-    <string name="ims_transport">IMS transport: %1$s</string>
     <string name="wifi">Wi-Fi</string>
     <string name="cellular">Cellular</string>
     <string name="power_nr">Power policy excludes NR. Battery Saver can cause this even when user and carrier settings allow 5G. Review Battery Saver yourself; UltimateIMS does not change power policy.</string>
@@ -54,7 +50,6 @@
     <string name="error_read">Status read failed; values remain unknown.</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
-    <string name="reading">Permission required or callback not yet received</string>
     <string name="observation_note">Data RAT, IMS registration, capabilities, and display icons are separate observations. This build does not establish the radio technology of an active voice call.</string>
     <string name="backend_start">Start selected backend</string>
     <string name="backend_stop">Stop backend</string>
@@ -120,7 +115,7 @@
     <string name="key_wfc_roaming_mode">Default roaming calling preference</string>
     <string name="key_wfc_roaming">Default Wi-Fi calling while roaming</string>
     <string name="key_vt">Carrier video calling availability</string>
-    <string name="key_vonr">Carrier VoNR availability</string>
+    <string name="key_vonr">VoNR / Vo5G availability</string>
     <string name="key_cross_sim">Carrier Cross-SIM calling availability</string>
     <string name="key_ut">UT supplementary services availability</string>
     <string name="key_nr_availability">NR availability: 1 NSA, 2 SA</string>
@@ -172,23 +167,18 @@
     <string name="nr_nsa_observed">LTE packet registration with a connected secondary NR is observed, indicating NSA. Display icons remain a separate observation.</string>
     <string name="nr_registration_unknown">NR registration is unknown or not established by the current observations. A 5G icon or enabled setting alone cannot establish it.</string>
     <string name="local_network_explain">Android 17 gates local networking with a system permission. Grant it explicitly, then tap Pair or Connect again. UltimateIMS keeps private ADB connections on 127.0.0.1 and does not scan LAN devices. Permission alone does not start pairing or a backend.</string>
-    <string name="nav_home">Status</string>
-    <string name="nav_ims">Calling</string>
+    <string name="nav_home">IMS &amp; radio</string>
+    <string name="nav_ims">Configure</string>
     <string name="nav_diagnostics">Diagnose</string>
     <string name="nav_network">Network</string>
     <string name="nav_tools">Tools</string>
-    <string name="intro_home">Your device and SIMs at a glance. Unknown values mean access is unavailable, not that a feature is off.</string>
-    <string name="intro_ims">Choose a SIM, edit a draft, then review and apply. Editing a value does not change your phone.</string>
+    <string name="intro_home">IMS registration, voice over 5G (VoNR), and LTE/5G radio controls for the selected SIM.</string>
+    <string name="intro_ims">Connect your selected backend here, then configure Wi-Fi calling, preferences, and advanced options.</string>
     <string name="intro_diagnostics">Understand registration and connectivity. Settings and icons are separate from an actual connection.</string>
     <string name="intro_network">Review system-wide connectivity check endpoints. Changes here affect every SIM and Wi-Fi.</string>
     <string name="intro_tools">Persistent VoLTE, original-value recovery, and advanced maintenance. Review each operation before continuing.</string>
-    <string name="intro_settings">Make UltimateIMS comfortable to use, then choose how to connect your backend.</string>
+    <string name="intro_settings">System appearance, language, privacy, and app information.</string>
     <string name="appearance">Appearance &amp; language</string>
-    <string name="theme_choose">Choose theme</string>
-    <string name="theme_system">Follow system</string>
-    <string name="theme_light">Light</string>
-    <string name="theme_dark">Dark</string>
-    <string name="theme_current">Theme: %1$s</string>
     <string name="dynamic_color">Use wallpaper colors</string>
     <string name="dynamic_color_explain">Optional Material You colors from your wallpaper, in both light and dark themes.</string>
     <string name="device_section">Device overview</string>
@@ -208,8 +198,6 @@
     <string name="group_5g">5G radio configuration</string>
     <string name="group_display">Network labels &amp; icons</string>
     <string name="group_advanced">Carrier &amp; advanced settings</string>
-    <string name="expanded">Expanded</string>
-    <string name="collapsed">Collapsed</string>
     <string name="change_action">Draft action</string>
     <string name="new_value">New value</string>
     <string name="array_hint">Enter comma-separated numbers. Changes are validated before saving.</string>
@@ -247,6 +235,14 @@
     <string name="policy_section">Why is 5G unavailable?</string>
     <string name="connection_ready">Connection ready · live reads available</string>
     <string name="connection_not_ready">A privileged connection is needed to read or apply these settings.</string>
-    <string name="connect_settings">Set up connection</string>
+    <string name="connect_settings">Open configuration &amp; backend</string>
     <string name="nav_settings">Settings</string>
+    <string name="radio_controls">Calling &amp; radio controls</string>
+    <string name="nr_nsa_toggle">5G NSA</string>
+    <string name="nr_sa_toggle">5G SA</string>
+    <string name="toggle_draft_note">Switches prepare changes. Review and apply when ready; they do not prove registration or a working VoNR call.</string>
+    <string name="choose_toggle">Choose enabled or disabled</string>
+    <string name="theme_system_automatic">Theme follows your system automatically on launch and when the system changes.</string>
+    <string name="array_empty">No entries</string>
+    <string name="preference_default">Carrier default (-1)</string>
 </resources>

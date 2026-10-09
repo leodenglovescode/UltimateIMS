@@ -26,7 +26,7 @@
 | POWER mask、省电阻止NR解释 | L | 每卡特权读取，33+ | 已接入；待真机 | PlatformOperations / FeaturePanels；只有构建与主机规则证据，设备行为待验收 |
 | 实际 NR 注册/SA/NSA与图标观测 | L | 每卡权限相关 | 部分观测；平台限制 | NR/用户设置、MMTel、IMS registrationTechnology/按NR的voice capability、nrState、data/voice RAT已接入；通话的厂商modem路径证据不可保证读取，不宣称VoNR通话成立 |
 | 持久化 VoLTE，VoIMS订阅 opt-in | T/L | 原始订阅数据库，33+需固件核验 | 已接入；待真机 | raw VoIMS opt-in + 高级通话用户值，标准框架通知；不附带 VoNR；无后端/无Wi-Fi重启通话未测 |
-| 持久化原值、unset、恢复、中断恢复 | L | 每卡已验证身份 | 已接入；主机通过 | RecoveryJournal / OperationCoordinator；真实 raw null 无已验证恢复路径时写前拒绝，-1 原样保留；43个核心测试 |
+| 持久化原值、unset、恢复、中断恢复 | L | 每卡已验证身份 | 已接入；主机通过 | RecoveryJournal / OperationCoordinator；真实 raw null 无已验证恢复路径时写前拒绝，-1 原样保留；49个核心测试 |
 | TikTok 三位数字 SIM ISO、明确确认 | C/L | 每卡；public key 34+ | 已接入；待真机 | API34+固定三位目标、两次确认、历史/desired保存与原值恢复；不改MCC/MNC；平台地区传播及TikTok均未测 |
 | TikTok/其他地区兼容状态 | C/L | 每卡，33+ | 已接入；待真机 | 读取真实SIM region；不按历史美化国家；其他app影响与实验限制明确说明 |
 | Captive Portal HTTP/HTTPS读写与原值恢复 | C/T/L | 设备 Settings.Global | 已接入；待真机 | 独立设备作用域，Settings.Global读/写/删除/null恢复逐项核验；NetworkStack探测优先级未测 |
@@ -39,7 +39,7 @@
 | QS VoLTE/IMS状态图块 | C | 设备入口+所选卡 | 已接入；待真机 | 实际TileService，显示当前已读取IMS状态，打开VoLTE恢复页；不会自动获取权限/切换；真机添加图块未测 |
 | 单卡/显式所有SIM、逐卡结果 | C/T/L | 已验证活动卡快照 | 已接入；待真机 | 明确所有SIM勾选、逐卡身份日志与结果，失败后剩余未执行；双卡设备未测 |
 | 实时配置、编辑草稿、选择性写入 | C/T/L | 每卡+设备 | 已接入；待真机 | snapshot/刷新与时间标记、草稿/历史严格区分；写后全量读取；后台或读取失败不推断当前值 |
-| 启用/禁用/还原/保持不变 | T/L | 每字段 | 已接入；主机通过 | RecoveryJournal / OperationCoordinator；真实 raw null 无已验证恢复路径时写前拒绝，-1 原样保留；43个核心测试 |
+| 启用/禁用/还原/保持不变 | T/L | 每字段 | 已接入；主机通过 | RecoveryJournal / OperationCoordinator；真实 raw null 无已验证恢复路径时写前拒绝，-1 原样保留；49个核心测试 |
 | 推荐/大陆5G/大陆LTE/全开启预设 | T | 草稿每卡 | 已接入；待真机 | PlatformOperations / FeaturePanels；只有构建与主机规则证据，设备行为待验收 |
 | 历史、备份导出/导入、选择性恢复 | C/T/L | 每卡/设备 | 已接入；待真机 | AtomicFile历史、private原值日志、版本化无身份配置草稿导入/导出、选择性恢复；导入不能覆盖原值，跨安装原值迁移不实现 |
 | CarrierConfig reset及删除验证 | C/T/L | 每卡特权 | 请求已接入；平台限制 | 只确认调用请求，永不报覆盖删除成功；保存恢复状态并禁用自动重应用 |
@@ -48,7 +48,7 @@
 | 私有无线ADB与已有root路径 | T/L | 显式启动 | 已接入；待真机 | 独立TLS/STLS/ADB帧、SPAKE2 JNI、固定私有启动入口、已有root显式路径；JNI主机通过，Android配对未测 |
 | 权限委托冲突、全局串行、超时未知 | L | 跨进程+特权服务 | 已接入；待真机 | 检查占用/委托/释放，UID+secret，单RPC队列；超时不取消、不盲目重试；真实权限冲突/死亡未测 |
 | 本地应用日志、过滤配置dump、脱敏导出 | C/T/L | 本地 | 已接入；待真机 | 固定非特权UID/标签logcat查看；报告白名单与受控英文事件，原始日志/URL/身份/IP/位置/秘密不自动导出 |
-| Auto/English/简体中文与可访问性 | C/T/L | app，33+ | 已接入；待真机 | LocaleManager、250个中英键/占位符对齐检查；Material 3浅色/深色/系统主题与可选壁纸色，详见UI_DESIGN；真实语言切换、200%字号/TalkBack未测 |
+| Auto/English/简体中文与可访问性 | C/T/L | app，33+ | 已接入；待真机 | LocaleManager、246个中英键/占位符对齐检查；Material 3平面开关列表、自动系统浅深色与壁纸配色，详见UI_DESIGN；真实语言切换、200%字号/TalkBack未测 |
 | 广告、商务/支付功能 | C | 第三方远端 | 排除 | 与无广告/遥测/云上传要求冲突，未引入 |
 
 ## 附加范围与明确限制
@@ -58,3 +58,7 @@
 - 系统门槛、运营商 provisioning、基带/频段/套餐、IMS服务和当前注册路径决定通信能力。应用不能创造 modem 功能；未公开/不匹配签名、权限拒绝或回读失败明确报未知/不支持，保留日志。
 - 原值完全恢复包括覆盖层结构、真实 null 订阅字段恢复和实际 VoNR 呼叫技术等存在可观测性/框架限制；没有用 placeholder 或成功提示替代。
 - 设备为空时无需猜测Android配对/双卡/重启/语音通过；全部真机验收见 DEVICE_ACCEPTANCE。
+
+## 0.4.0-dev 导航与后端补充
+
+后端/高级配置统一在配置页；IMS 注册证据与 VoNR/Vo5G、NSA/SA、LTE 等直接开关在 IMS 与无线页。当前/草稿值明确区分，未知不等于关闭，原有确认/恢复约束保留。Shizuku 预检前不绑定 broker，认证超时保留未知结果，启动快照只交接一次。49 个核心测试通过；新增 6 项验证开关类型、默认/未知和 NSA/SA 保留规则。ADB 升级安装并回读版本成功，未继续任何功能/后端/主题真机测试。

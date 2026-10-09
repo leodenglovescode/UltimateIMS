@@ -39,7 +39,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private boolean reading;
     private boolean started;
     private long readGeneration;
-    private final Map<Integer, ImsObservation> observations = new HashMap<>();
     private SubscriptionManager.OnSubscriptionsChangedListener subscriptionListener;
     private CarrierObservation carrierObservation;
     @androidx.annotation.RequiresApi(34)
@@ -52,52 +51,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private final BroadcastReceiver powerReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { refresh(); }
     };
-    private final class ImsObservation {
-        final ImsMmTelManager manager;
-        int registrationText = R.string.reading;
-        Integer transport;
-        String capabilities;
-        boolean registrationAttached;
-        boolean capabilityAttached;
-        final int subId;
-        final RegistrationManager.RegistrationCallback registration = new RegistrationManager.RegistrationCallback() {
-            @Override public void onRegistered(int technology) { registrationText = R.string.registered; render(); }
-            @Override public void onRegistering(int technology) { registrationText = R.string.registering; transport = null; capabilities = null; render(); }
-            @Override public void onUnregistered(ImsReasonInfo info) { registrationText = R.string.not_registered; transport = null; capabilities = null; render(); }
-        };
-        final ImsMmTelManager.CapabilityCallback capability = new ImsMmTelManager.CapabilityCallback() {
-            @Override public void onCapabilitiesStatusChanged(MmTelFeature.MmTelCapabilities value) {
-                capabilities = bool(value.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE)) + " / "
-                        + bool(value.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO)) + " / "
-                        + bool(value.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_UT));
-                render();
-            }
-        };
-        ImsObservation(ImsMmTelManager manager, int subId) { this.manager = manager; this.subId = subId; }
-        // 回调支持运营商权限；读取被拒时保留未知，不能用配置替代注册观测。
-        @android.annotation.SuppressLint("MissingPermission")
-        void attach() {
-            try {
-                var phone = getSystemService(android.telephony.TelephonyManager.class).createForSubscriptionId(subId);
-                boolean precise = checkSelfPermission("android.permission.READ_PRECISE_PHONE_STATE") == PackageManager.PERMISSION_GRANTED;
-                boolean privileged = checkSelfPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") == PackageManager.PERMISSION_GRANTED;
-                if (!precise && !privileged && !phone.hasCarrierPrivileges()) return;
-            } catch (SecurityException | UnsupportedOperationException e) { return; }
-            try { manager.registerImsRegistrationCallback(getMainExecutor(), registration); registrationAttached = true; }
-            catch (SecurityException | ImsException | UnsupportedOperationException e) { /* 无法读取时保持未知。 */ }
-            try { manager.registerMmTelCapabilityCallback(getMainExecutor(), capability); capabilityAttached = true; }
-            catch (SecurityException | ImsException | UnsupportedOperationException e) { /* 不把配置值当作能力。 */ }
-            try { manager.getRegistrationTransportType(getMainExecutor(), value -> { transport = value; render(); }); }
-            catch (SecurityException | UnsupportedOperationException e) { /* 未知。 */ }
-        }
-        @android.annotation.SuppressLint("MissingPermission")
-        void detach() {
-            try {
-                if (registrationAttached) manager.unregisterImsRegistrationCallback(registration);
-                if (capabilityAttached) manager.unregisterMmTelCapabilityCallback(capability);
-            } catch (SecurityException | UnsupportedOperationException e) { /* 权限撤销后仍清理本地观测。 */ }
-        }
-    }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         workspace = ((UltimateApplication)getApplication()).workspace();
@@ -132,16 +85,18 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         navigation = new com.google.android.material.bottomnavigation.BottomNavigationView(this);
         navigation.setLabelVisibilityMode(com.google.android.material.navigation.NavigationBarView.LABEL_VISIBILITY_LABELED);
-        int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_diagnostics,R.string.nav_network,R.string.nav_tools};
-        int[] icons = {R.drawable.ic_home,R.drawable.ic_call,R.drawable.ic_diagnostics,R.drawable.ic_network,R.drawable.ic_tools};
-        for (int i=0;i<5;i++) navigation.getMenu().add(0,100+i,i,labels[i]).setIcon(icons[i]);
+        int[] destinations = {0,1,3,4};
+        int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_network,R.string.nav_tools};
+        int[] icons = {R.drawable.ic_call,R.drawable.ic_settings,R.drawable.ic_network,R.drawable.ic_tools};
+        for (int i=0;i<destinations.length;i++) navigation.getMenu().add(0,100+destinations[i],i,labels[i]).setIcon(icons[i]);
         navigation.setOnItemSelectedListener(item -> { int target = item.getItemId()-100; if (target != page) navigate(target); return true; });
         for (int i=0;i<toolbar.getMenu().size();i++) toolbar.getMenu().getItem(i).setIconTintList(android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurface)));
         if (getResources().getConfiguration().fontScale >= 1.3f || getResources().getConfiguration().screenWidthDp >= 600) {
             drawer = new androidx.drawerlayout.widget.DrawerLayout(this); drawer.addView(root,new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(-1,-1));
             drawerNavigation = new com.google.android.material.navigation.NavigationView(this); drawerNavigation.setItemMaxLines(3);
             drawerNavigation.setFitsSystemWindows(true);
-            for (int i=0;i<pages.length;i++) drawerNavigation.getMenu().add(0,300+i,i,pages[i]).setIcon(i < icons.length ? icons[i] : R.drawable.ic_settings).setCheckable(true);
+            int[] drawerPages = {0,1,3,4,5};
+            for (int i=0;i<drawerPages.length;i++) drawerNavigation.getMenu().add(0,300+drawerPages[i],i,pages[drawerPages[i]]).setIcon(i < icons.length ? icons[i] : R.drawable.ic_settings).setCheckable(true);
             drawerNavigation.setNavigationItemSelectedListener(item -> { drawer.closeDrawers(); navigate(item.getItemId()-300); return true; });
             var params = new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(Math.min(dp(360),getResources().getDisplayMetrics().widthPixels-dp(56)),-1); params.gravity = androidx.core.view.GravityCompat.START;
             drawer.addView(drawerNavigation,params);
@@ -183,7 +138,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             carrierObservation = null;
         }
         getSystemService(SubscriptionManager.class).removeOnSubscriptionsChangedListener(subscriptionListener);
-        for (var observation : observations.values()) observation.detach(); observations.clear();
         // 回到前台时重新读取，禁止把离线观测作为当前状态。
         snapshot = null; super.onStop();
     }
@@ -196,7 +150,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (reading || !started) return;
         final long requestedGeneration = readGeneration;
         reading = true; snapshot = null;
-        for (var observation : observations.values()) observation.detach(); observations.clear(); render();
+        render();
         reader.execute(() -> {
             FrameworkReader.Snapshot result;
             try { result = new FrameworkReader(this).read(); }
@@ -209,12 +163,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
                 snapshot = completed;
                 if (snapshot != null) {
                     if (snapshot.sims().stream().noneMatch(s -> s.subId() == selectedSub)) selectedSub = snapshot.sims().isEmpty() ? -1 : snapshot.sims().get(0).subId();
-                    for (var sim : snapshot.sims()) {
-                        try {
-                            var observation = new ImsObservation(getSystemService(android.telephony.ims.ImsManager.class).getImsMmTelManager(sim.subId()), sim.subId());
-                            observations.put(sim.subId(), observation); observation.attach();
-                        } catch (RuntimeException e) { /* 不支持或权限不足，状态保持未知。 */ }
-                    }
                 }
                 render();
             });
@@ -226,8 +174,8 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         View focus = getCurrentFocus(); boolean searchFocused = focus != null && "config_search".equals(focus.getTag());
         int searchPosition = searchFocused ? ((EditText)focus).getSelectionStart() : -1;
         body = content; body.removeAllViews(); toolbar.setTitle(new int[]{R.string.nav_home,R.string.nav_ims,R.string.nav_diagnostics,R.string.nav_network,R.string.nav_tools,R.string.nav_settings}[page]);
-        if (drawerNavigation != null) drawerNavigation.setCheckedItem(300+page);
-        if (page < 5) navigation.getMenu().findItem(100+page).setChecked(true);
+        if (drawerNavigation != null) drawerNavigation.setCheckedItem(300+(page == 2 ? 0 : page));
+        if (page < 5) navigation.getMenu().findItem(100+(page == 2 ? 0 : page)).setChecked(true);
         else for (int i=0;i<navigation.getMenu().size();i++) navigation.getMenu().getItem(i).setChecked(false);
         renderedPage = page; renderedSub = selectedSub;
         scroll.post(() -> {
@@ -240,7 +188,30 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) button(R.string.permission, () -> requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, 1));
         if (!workspace.sims().isEmpty() && workspace.selected(selectedSub) == null) selectedSub = workspace.sims().get(0).getInt("sub");
         panels.attach(body,selectedSub);
-        if (page == 1 || page == 4) { privilegedSimSelector(); panels.attach(body,selectedSub); panels.status(); if (page == 1) panels.ims(); else panels.recovery(); return; }
+        if (page == 1) {
+            backendSetup(); body = content; privilegedSimSelector(); panels.attach(content,selectedSub); panels.ims(); return;
+        }
+        if (page == 4) { privilegedSimSelector(); panels.attach(body,selectedSub); panels.status(); panels.recovery(); return; }
+        if (page == 0) {
+            privilegedSimSelector(); panels.attach(content,selectedSub);
+            if (!workspace.backend.ready()) button(R.string.connect_settings,this::openConfigurationPage);
+            heading(R.string.sim_status);
+            if (snapshot == null) text(getString(reading ? R.string.loading : R.string.error_read),false);
+            if (snapshot != null) {
+                if (snapshot.sims().isEmpty()) text(getString(R.string.no_sims),false);
+                var sim = snapshot.sims().stream().filter(item -> item.subId() == selectedSub).findFirst().orElse(null);
+                if (sim != null) {
+                    text(getString(R.string.default_data,bool(sim.defaultData())),false);
+                    text(getString(R.string.sim_country,sim.country() == null || sim.country().isEmpty() ? unknown() : sim.country()),false);
+                    text(getString(R.string.rat,sim.dataRat() == null || sim.dataRat() == 0 ? unknown() : rat(sim.dataRat())),false);
+                }
+            }
+            panels.radio(); body = content; button(R.string.diagnostics,() -> navigate(2));
+            heading(R.string.device_section);
+            text(getString(R.string.device,Build.MODEL,Build.VERSION.RELEASE,Build.VERSION.SDK_INT),false);
+            text(getString(R.string.battery,bool(getSystemService(PowerManager.class).isPowerSaveMode())),false); text(getString(R.string.security_patch,Build.VERSION.SECURITY_PATCH),false);
+            return;
+        }
         if (page == 3) { panels.status(); panels.system(); return; }
         if (page == 2) {
             privilegedSimSelector(); panels.attach(body,selectedSub); panels.status(); panels.diagnostics();
@@ -257,27 +228,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
                 network();
             } else text(unknown(),false);
             return;
-        }
-        panels.status();
-        heading(R.string.device_section);
-        text(getString(R.string.backend, backendName()), false);
-        text(getString(R.string.device, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT), false);
-        text(getString(R.string.security_patch,Build.VERSION.SECURITY_PATCH),false);
-        text(getString(R.string.battery, bool(getSystemService(PowerManager.class).isPowerSaveMode())), false);
-        if (snapshot == null) { text(getString(reading ? R.string.loading : R.string.error_read), false); return; }
-        if (snapshot.sims().isEmpty()) { text(getString(R.string.no_sims), false); return; }
-        body = content; simSelector(); heading(R.string.sim_status);
-        FrameworkReader.Sim sim = snapshot.sims().stream().filter(s -> s.subId() == selectedSub).findFirst().orElse(null);
-        if (sim == null) return;
-        if (page == 0) {
-            text(getString(R.string.default_data, bool(sim.defaultData())), false);
-            text(getString(R.string.sim_country, sim.country() == null || sim.country().isEmpty() ? unknown() : sim.country()), false);
-            text(getString(R.string.rat, sim.dataRat() == null || sim.dataRat() == 0 ? unknown() : rat(sim.dataRat())), false);
-            var ims = observations.get(sim.subId());
-            text(getString(R.string.ims_registration, ims == null ? unknown() : getString(ims.registrationText)), false);
-            text(getString(R.string.capabilities, ims == null || ims.capabilities == null ? unknown() : ims.capabilities), false);
-            text(getString(R.string.ims_transport, ims == null || ims.transport == null ? unknown() : transport(ims.transport)), false);
-            text(getString(R.string.observation_note), false);
         }
     }
     private void simSelector() {
@@ -297,10 +247,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     private void settings() {
         heading(R.string.appearance);
-        String[] themes = {getString(R.string.theme_system),getString(R.string.theme_light),getString(R.string.theme_dark)};
-        button(R.string.theme_choose,() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.theme_choose)
-                .setSingleChoiceItems(themes,ThemePreferences.selected(this),(d,n) -> { d.dismiss(); ThemePreferences.set(this,n); }).setNegativeButton(R.string.cancel,null).show());
-        text(getString(R.string.theme_current,themes[ThemePreferences.selected(this)]),false);
+        text(getString(R.string.theme_system_automatic),false);
         com.google.android.material.materialswitch.MaterialSwitch dynamic = new com.google.android.material.materialswitch.MaterialSwitch(this);
         dynamic.setText(R.string.dynamic_color); dynamic.setMinHeight(dp(56)); dynamic.setChecked(ThemePreferences.dynamic(this));
         dynamic.setOnCheckedChangeListener((v,checked) -> { ThemePreferences.setDynamic(this,checked); recreate(); }); MaterialUi.add(body,dynamic);
@@ -308,7 +255,11 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         button(R.string.language, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.language)
                 .setItems(new String[]{getString(R.string.auto),getString(R.string.english),getString(R.string.chinese)}, (d, index) ->
                     getSystemService(LocaleManager.class).setApplicationLocales(index == 0 ? LocaleList.getEmptyLocaleList() : LocaleList.forLanguageTags(index == 1 ? "en" : "zh-CN"))).show());
-        body = content; heading(R.string.backend_section);
+        panels.attach(content,selectedSub); panels.about();
+        body = content; heading(R.string.privacy_section); text(getString(R.string.privacy),false);
+    }
+    private void backendSetup() {
+        heading(R.string.backend_section);
         text(getString(R.string.backend,backendName()),false);
         button(R.string.backend_choose, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.backend_choose)
                 .setItems(new String[]{getString(R.string.shizuku), getString(R.string.adb), getString(R.string.root)}, (d, index) -> {
@@ -316,15 +267,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
                     getPreferences(MODE_PRIVATE).edit().putString("selected_backend", BackendSession.Mode.values()[index].name()).apply(); render();
                 }).show());
         panels.attach(content,selectedSub); panels.settings(chosenBackend());
-        body = content; heading(R.string.privacy_section); text(getString(R.string.privacy),false);
     }
     BackendSession.Mode chosenBackend() {
         String chosen = getPreferences(MODE_PRIVATE).getString("selected_backend", "");
         return chosen.isEmpty() ? null : BackendSession.Mode.valueOf(chosen);
     }
     void openImsPage() { navigate(1); }
-    void openSettingsPage() { navigate(5); }
-    boolean settingsVisible() { return page == 5; }
+    void openConfigurationPage() { navigate(1); }
+    boolean configurationVisible() { return page == 1; }
     @Override protected void onActivityResult(int request, int result, Intent data) { super.onActivityResult(request,result,data); panels.fileResult(request,result,data); }
     private void privilegedSimSelector() {
         var records = workspace.sims();

@@ -50,3 +50,7 @@ ADB 使用自签名证书与共享码认证，不是公有 CA HTTPS。配对密�
 ## 0.3.0-dev UI 边界
 
 MainActivity 改为 AppCompatActivity；MaterialUi 统一 Material 3 控件、语义色、表单与间距。ThemePreferences 仅持久化外观；UltimateApplication 在 Activity 创建前应用 DayNight 与可选动态颜色。没有改变特权选择、原始备份格式、恢复引擎或通信白名单。功能页仍由原 WorkspaceController 处理，视觉变化不获取后端。详见 UI_DESIGN.md。
+
+## 0.4.0-dev 页面与连接增量
+
+MaterialUi 的分组容器改为无卡片平面列表，ConfigurationToggle 集中管理布尔/0-1 用户偏好与 NSA/SA 数组语义。两条主要页面为 IMS 与无线、配置；后者同时持有显式后端操作。原恢复日志与第一方通信架构不变。BackendManager 的授权回调绑定 epoch，认证使用相同串行 RPC 和未知超时约束；一次性认证快照传给 WorkspaceController，消除重复启动读取。注册与可用性证据仍由真实框架观测提供，不从历史或开关推断。

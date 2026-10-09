@@ -27,11 +27,14 @@ final class MaterialUi {
         v.setAccessibilityHeading(heading); v.setTextIsSelectable(!heading); v.setPadding(0,dp(c,4),0,dp(c,4)); return v;
     }
     static LinearLayout card(LinearLayout parent, String title) {
-        Context c = parent.getContext(); MaterialCardView card = new MaterialCardView(c);
-        card.setRadius(dp(c,20)); card.setCardElevation(0); card.setStrokeWidth(0);
-        card.setCardBackgroundColor(color(c,com.google.android.material.R.attr.colorSurfaceContainer));
-        LinearLayout contents = column(c); contents.setPadding(dp(c,20),dp(c,16),dp(c,20),dp(c,12)); card.addView(contents); add(parent,card);
+        // 平面分组取代逐项卡片；标题和留白建立层级。
+        Context c = parent.getContext(); LinearLayout contents = column(c);
+        contents.setPadding(0,dp(c,12),0,dp(c,4)); add(parent,contents);
         if (title != null) add(contents,text(c,title,true)); return contents;
+    }
+    static void divider(LinearLayout parent) {
+        View line = new View(parent.getContext()); line.setBackgroundColor(color(parent.getContext(),com.google.android.material.R.attr.colorOutlineVariant));
+        parent.addView(line,new LinearLayout.LayoutParams(-1,dp(parent.getContext(),1)));
     }
     static MaterialButton button(Context c, int label, Runnable action, boolean primary) {
         int style = primary ? com.google.android.material.R.attr.materialButtonStyle : com.google.android.material.R.attr.materialButtonOutlinedStyle;
