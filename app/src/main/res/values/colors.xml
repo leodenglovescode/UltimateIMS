@@ -1,0 +1,21 @@
+<resources>
+    <color name="ui_primary">#006B5E</color>
+    <color name="ui_on_primary">#FFFFFF</color>
+    <color name="ui_primary_container">#9EF2DD</color>
+    <color name="ui_on_primary_container">#002019</color>
+    <color name="ui_secondary">#4A635B</color>
+    <color name="ui_on_secondary">#FFFFFF</color>
+    <color name="ui_secondary_container">#CCE8DC</color>
+    <color name="ui_on_secondary_container">#102019</color>
+    <color name="ui_surface">#F5FAF6</color>
+    <color name="ui_on_surface">#18211D</color>
+    <color name="ui_surface_variant">#DAE5DE</color>
+    <color name="ui_on_surface_variant">#3F4943</color>
+    <color name="ui_outline">#6F7972</color>
+    <color name="ui_outline_variant">#BEC9C1</color>
+    <color name="ui_surface_container">#E9EFEB</color>
+    <color name="ui_error">#BA1A1A</color>
+    <color name="ui_on_error">#FFFFFF</color>
+    <color name="ui_error_container">#FFDAD6</color>
+    <color name="ui_on_error_container">#410002</color>
+</resources>

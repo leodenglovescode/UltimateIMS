@@ -6,7 +6,12 @@ Copyright 2026 leodenglovescode
 Shizuku API / provider / aidl / shared 13.1.5, RikkaW, MIT
 HiddenApiBypass 6.1, LSPosed contributors, Apache-2.0
 Conscrypt Android 2.7.0, The Android Open Source Project / Google contributors, Apache-2.0
-AndroidX Annotation 1.3.0, The Android Open Source Project, Apache-2.0
+Material Components Android 1.14.0, Google / The Android Open Source Project, Apache-2.0
+AndroidX AppCompat 1.8.0 and AndroidX runtime dependencies, The Android Open Source Project, Apache-2.0
+Kotlin stdlib / coroutines and JetBrains annotations, JetBrains contributors, Apache-2.0
+Google Error Prone / Guava listenablefuture, Google contributors, Apache-2.0
+JSpecify annotations, JSpecify contributors, Apache-2.0
+完整解析版本见 docs/runtime-dependencies.json。
 BoringSSL AOSP ecc1358826150d6a1851c517c325b0e6c0e1b8be, OpenSSL / Google contributors,
 OpenSSL / SSLeay / ISC and file-specific licenses.
 

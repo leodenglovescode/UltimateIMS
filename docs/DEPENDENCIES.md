@@ -9,7 +9,11 @@
 | Android SDK / NDK | SDK37，buildtools36，NDK28.1.13356709，官方SDK Manager | SDK协议；编译平台工具 |
 | JDK | 本机Homebrew OpenJDK21 | GPLv2+Classpath exception；主机构建 |
 | Shizuku API/provider/aidl/shared | 13.1.5，dev.rikka.shizuku，官方RikkaApps/Shizuku-API | MIT（RikkaW）；认证UserService传输 |
-| AndroidX Annotation | 1.3.0，Google Maven，Shizuku传递依赖 | Apache-2.0；标准注解 |
+| Material Components Android | 1.14.0，Google Maven，官方 material-components/material-components-android | Apache-2.0；Material 3 控件、语义色、动态配色 |
+| AndroidX AppCompat | 1.8.0，Google Maven，官方 AndroidX | Apache-2.0；DayNight 外观、可访问性对话框 |
+| AndroidX Annotation 及其余 AndroidX UI 依赖 | Annotation 1.8.1；完整解析树见下方记录 | Apache-2.0；注解、导航/窗口/生命周期等 |
+| Kotlin stdlib / coroutines / JetBrains annotations | 2.2.10 / 1.6.4 / 13.0，官方 Maven Central | Apache-2.0；标准运行时传递依赖 |
+| Error Prone / Guava listenablefuture / JSpecify | 2.15.0 / 1.0 / 1.0.0，官方 Maven Central | Apache-2.0；注解/标准 future 传递依赖 |
 | HiddenApiBypass | 6.1，org.lsposed.hiddenapibypass，官方LSPosed/AndroidHiddenApiBypass | Apache-2.0；集中隐藏API访问，逐签名核验仍必须执行 |
 | Conscrypt Android | 2.7.0，org.conscrypt:conscrypt-android，官方google/conscrypt | Apache-2.0及NOTICE；局部TLS1.3/exporter，不注册为全局provider |
 | BoringSSL | 官方AOSP external/boringssl commit ecc1358826150d6a1851c517c325b0e6c0e1b8be | 官方LICENSE包含OpenSSL/SSLeay/ISC等文件许可；JNI SPAKE2/HKDF/AES128-GCM |

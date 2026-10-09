@@ -1,0 +1,429 @@
+[
+  {
+    "group": "androidx.activity",
+    "artifact": "activity",
+    "version": "1.8.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.annotation",
+    "artifact": "annotation-experimental",
+    "version": "1.4.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.annotation",
+    "artifact": "annotation-jvm",
+    "version": "1.8.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.appcompat",
+    "artifact": "appcompat",
+    "version": "1.8.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.appcompat",
+    "artifact": "appcompat-resources",
+    "version": "1.8.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.arch.core",
+    "artifact": "core-common",
+    "version": "2.2.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.arch.core",
+    "artifact": "core-runtime",
+    "version": "2.2.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.cardview",
+    "artifact": "cardview",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.collection",
+    "artifact": "collection-jvm",
+    "version": "1.4.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.concurrent",
+    "artifact": "concurrent-futures",
+    "version": "1.1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.constraintlayout",
+    "artifact": "constraintlayout",
+    "version": "2.2.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.constraintlayout",
+    "artifact": "constraintlayout-core",
+    "version": "1.1.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.coordinatorlayout",
+    "artifact": "coordinatorlayout",
+    "version": "1.1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.core",
+    "artifact": "core",
+    "version": "1.16.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.core",
+    "artifact": "core-ktx",
+    "version": "1.16.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.core",
+    "artifact": "core-viewtree",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.cursoradapter",
+    "artifact": "cursoradapter",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.customview",
+    "artifact": "customview",
+    "version": "1.2.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.drawerlayout",
+    "artifact": "drawerlayout",
+    "version": "1.1.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.dynamicanimation",
+    "artifact": "dynamicanimation",
+    "version": "1.1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.emoji2",
+    "artifact": "emoji2",
+    "version": "1.3.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.emoji2",
+    "artifact": "emoji2-views-helper",
+    "version": "1.3.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.fragment",
+    "artifact": "fragment",
+    "version": "1.5.4",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.graphics",
+    "artifact": "graphics-shapes-android",
+    "version": "1.0.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.interpolator",
+    "artifact": "interpolator",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-common",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-livedata",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-livedata-core",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-process",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-runtime",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-viewmodel",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "artifact": "lifecycle-viewmodel-savedstate",
+    "version": "2.6.2",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.loader",
+    "artifact": "loader",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.profileinstaller",
+    "artifact": "profileinstaller",
+    "version": "1.4.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.recyclerview",
+    "artifact": "recyclerview",
+    "version": "1.2.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.resourceinspection",
+    "artifact": "resourceinspection-annotation",
+    "version": "1.0.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.savedstate",
+    "artifact": "savedstate",
+    "version": "1.2.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.startup",
+    "artifact": "startup-runtime",
+    "version": "1.1.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.tracing",
+    "artifact": "tracing",
+    "version": "1.2.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.transition",
+    "artifact": "transition",
+    "version": "1.5.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.vectordrawable",
+    "artifact": "vectordrawable",
+    "version": "1.1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.vectordrawable",
+    "artifact": "vectordrawable-animated",
+    "version": "1.1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.versionedparcelable",
+    "artifact": "versionedparcelable",
+    "version": "1.1.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.viewpager",
+    "artifact": "viewpager",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "androidx.viewpager2",
+    "artifact": "viewpager2",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "com.google.android.material",
+    "artifact": "material",
+    "version": "1.14.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "com.google.errorprone",
+    "artifact": "error_prone_annotations",
+    "version": "2.15.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "com.google.guava",
+    "artifact": "listenablefuture",
+    "version": "1.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "dev.rikka.shizuku",
+    "artifact": "aidl",
+    "version": "13.1.5",
+    "source": "Google Maven / Maven Central",
+    "license": "MIT"
+  },
+  {
+    "group": "dev.rikka.shizuku",
+    "artifact": "api",
+    "version": "13.1.5",
+    "source": "Google Maven / Maven Central",
+    "license": "MIT"
+  },
+  {
+    "group": "dev.rikka.shizuku",
+    "artifact": "provider",
+    "version": "13.1.5",
+    "source": "Google Maven / Maven Central",
+    "license": "MIT"
+  },
+  {
+    "group": "dev.rikka.shizuku",
+    "artifact": "shared",
+    "version": "13.1.5",
+    "source": "Google Maven / Maven Central",
+    "license": "MIT"
+  },
+  {
+    "group": "org.conscrypt",
+    "artifact": "conscrypt-android",
+    "version": "2.7.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains",
+    "artifact": "annotations",
+    "version": "13.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "artifact": "kotlin-stdlib",
+    "version": "2.2.10",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "artifact": "kotlin-stdlib-jdk7",
+    "version": "1.8.22",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "artifact": "kotlin-stdlib-jdk8",
+    "version": "1.8.22",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "artifact": "kotlinx-coroutines-android",
+    "version": "1.6.4",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "artifact": "kotlinx-coroutines-core-jvm",
+    "version": "1.6.4",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.jspecify",
+    "artifact": "jspecify",
+    "version": "1.0.0",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  },
+  {
+    "group": "org.lsposed.hiddenapibypass",
+    "artifact": "hiddenapibypass",
+    "version": "6.1",
+    "source": "Google Maven / Maven Central",
+    "license": "Apache-2.0 and bundled notices"
+  }
+]

@@ -11,6 +11,12 @@ public final class UltimateApplication extends Application {
     private WorkspaceController workspace;
     public static final String STATUS_CHANGED = "io.github.leodenglovescode.ultimateims.STATUS_CHANGED";
     @Override protected void attachBaseContext(Context base) { super.attachBaseContext(base); ShizukuProvider.disableAutomaticSuiInitialization(); }
+    @Override public void onCreate() {
+        super.onCreate(); ThemePreferences.apply(this);
+        com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this,
+                new com.google.android.material.color.DynamicColorsOptions.Builder()
+                        .setPrecondition((activity, theme) -> ThemePreferences.dynamic(activity)).build());
+    }
     public synchronized BackendManager backend() {
         if (backend == null) backend = new BackendManager(this, () -> {
             sendBroadcast(new android.content.Intent(STATUS_CHANGED).setPackage(getPackageName()));

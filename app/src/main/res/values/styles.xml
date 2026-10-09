@@ -1,8 +1,32 @@
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#146B63</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/ui_surface</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowBackground">#F4F7F6</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="colorPrimary">@color/ui_primary</item>
+        <item name="colorOnPrimary">@color/ui_on_primary</item>
+        <item name="colorPrimaryContainer">@color/ui_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/ui_on_primary_container</item>
+        <item name="colorSecondary">@color/ui_secondary</item>
+        <item name="colorOnSecondary">@color/ui_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/ui_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/ui_on_secondary_container</item>
+        <item name="colorSurface">@color/ui_surface</item>
+        <item name="colorOnSurface">@color/ui_on_surface</item>
+        <item name="colorSurfaceVariant">@color/ui_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/ui_on_surface_variant</item>
+        <item name="colorOutline">@color/ui_outline</item>
+        <item name="colorOutlineVariant">@color/ui_outline_variant</item>
+        <item name="colorSurfaceContainer">@color/ui_surface_container</item>
+        <item name="colorError">@color/ui_error</item>
+        <item name="colorOnError">@color/ui_on_error</item>
+        <item name="colorErrorContainer">@color/ui_error_container</item>
+        <item name="colorOnErrorContainer">@color/ui_on_error_container</item>
+        <item name="android:colorBackground">@color/ui_surface</item>
+        <item name="colorOnBackground">@color/ui_on_surface</item>
     </style>
 </resources>

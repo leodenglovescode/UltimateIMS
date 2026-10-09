@@ -46,3 +46,7 @@ ADB 使用自签名证书与共享码认证，不是公有 CA HTTPS。配对密�
 | P7 | Android 13–17、双卡/语言/可访问 | 待真机验收 | DEVICE_ACCEPTANCE 全项证据 |
 
 首个只读增量与本次设备操作增量都保留提交；后续首先执行只读真机验收，不擅自重启、重置或中断通话。矩阵保留所有范围及平台限制，不用按钮存在证明验收完成。
+
+## 0.3.0-dev UI 边界
+
+MainActivity 改为 AppCompatActivity；MaterialUi 统一 Material 3 控件、语义色、表单与间距。ThemePreferences 仅持久化外观；UltimateApplication 在 Activity 创建前应用 DayNight 与可选动态颜色。没有改变特权选择、原始备份格式、恢复引擎或通信白名单。功能页仍由原 WorkspaceController 处理，视觉变化不获取后端。详见 UI_DESIGN.md。

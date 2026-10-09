@@ -30,7 +30,7 @@
 | TikTok 三位数字 SIM ISO、明确确认 | C/L | 每卡；public key 34+ | 已接入；待真机 | API34+固定三位目标、两次确认、历史/desired保存与原值恢复；不改MCC/MNC；平台地区传播及TikTok均未测 |
 | TikTok/其他地区兼容状态 | C/L | 每卡，33+ | 已接入；待真机 | 读取真实SIM region；不按历史美化国家；其他app影响与实验限制明确说明 |
 | Captive Portal HTTP/HTTPS读写与原值恢复 | C/T/L | 设备 Settings.Global | 已接入；待真机 | 独立设备作用域，Settings.Global读/写/删除/null恢复逐项核验；NetworkStack探测优先级未测 |
-| 门户 endpoint presets | T/L | 设备 | 请求已接入；平台限制 | 只确认调用请求，永不报覆盖删除成功；保存恢复状态并禁用自动重应用 |
+| 门户 endpoint presets | T/L | 设备 | 已接入；待真机 | Google/V2EX/Xiaomi/vivo/Huawei预设形成草稿，明确应用后读取设置核验；实际NetworkStack行为未测 |
 | 连接验证、门户与计费状态 | L | 设备，33+ | 已接入；待真机 | PlatformOperations / FeaturePanels；只有构建与主机规则证据，设备行为待验收 |
 | 用户主动DNS/HTTP/TLS连接诊断（HTTP限preset域） | L | 用户选择网络/每卡 | 已接入；待真机 | PlatformOperations / FeaturePanels；只有构建与主机规则证据，设备行为待验收 |
 | “为什么5G不可用” | L | 每卡+设备 | 已接入；待真机 | USER/POWER/CARRIER掩码、后台状态、NR观测、注册与不足证据分开；省电不自动关闭；策略规则主机通过 |
@@ -48,7 +48,7 @@
 | 私有无线ADB与已有root路径 | T/L | 显式启动 | 已接入；待真机 | 独立TLS/STLS/ADB帧、SPAKE2 JNI、固定私有启动入口、已有root显式路径；JNI主机通过，Android配对未测 |
 | 权限委托冲突、全局串行、超时未知 | L | 跨进程+特权服务 | 已接入；待真机 | 检查占用/委托/释放，UID+secret，单RPC队列；超时不取消、不盲目重试；真实权限冲突/死亡未测 |
 | 本地应用日志、过滤配置dump、脱敏导出 | C/T/L | 本地 | 已接入；待真机 | 固定非特权UID/标签logcat查看；报告白名单与受控英文事件，原始日志/URL/身份/IP/位置/秘密不自动导出 |
-| Auto/English/简体中文与可访问性 | C/T/L | app，33+ | 已接入；待真机 | LocaleManager、173个中英键/占位符对齐检查；真实语言切换、200%字号/TalkBack未测 |
+| Auto/English/简体中文与可访问性 | C/T/L | app，33+ | 已接入；待真机 | LocaleManager、250个中英键/占位符对齐检查；Material 3浅色/深色/系统主题与可选壁纸色，详见UI_DESIGN；真实语言切换、200%字号/TalkBack未测 |
 | 广告、商务/支付功能 | C | 第三方远端 | 排除 | 与无广告/遥测/云上传要求冲突，未引入 |
 
 ## 附加范围与明确限制
