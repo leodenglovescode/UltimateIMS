@@ -135,7 +135,7 @@ public final class BackendManager {
                 candidate.asBinder().linkToDeath(() -> { if (channel == candidate) { authenticatedRead = false; initialSnapshot = null; channel = null; update("Privileged backend died; recovery may be required"); } }, 0);
                 channel = candidate;
                 Bundle result = invoke(Protocol.SNAPSHOT, new Bundle());
-                if (!result.getBoolean("ok")) throw new IllegalStateException("Initial authenticated read failed");
+                if (!result.getBoolean("ok")) throw new IllegalStateException("Preparation[initial-read]: " + result.getString("error", "Framework operation failed: IllegalStateException"));
                 if (requestedEpoch != epoch || transitioning) { failedChannel = candidate; channel = null; return; }
                 if (selectedMode == BackendSession.Mode.SHIZUKU && !Shizuku.pingBinder()) throw new IllegalStateException("Shizuku disconnected during authentication");
                 initialSnapshot = result.deepCopy(); authenticatedRead = true; update("Selected backend ready and authenticated");

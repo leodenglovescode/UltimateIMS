@@ -9,7 +9,7 @@
 - `WorkspaceController`：应用唯一的串行操作队列，AndroidKeyStore 安装私有 HMAC、noBackup 日志、历史、逐卡执行、恢复、APN 独立日志、ready 时用户选择的 CarrierConfig 重应用。
 - `backend/PlatformMethods` / `PlatformOperations`：集中逐参数与返回类型检查。Android 13 的订阅 setter 返回 int、Android 16 返回 void，实际版本只接受已确认形状，不用猜测事务码。原始 getter 与标准 IMS 用户 setter 分开；用户 setter 保留系统 capability 更新通知。
 - `backend/PrivilegeService`：官方 UserService 与私有 app_process 入口共用第一方窄协议；应用 UID + 256 bit 内存 secret 校验。私有 provider 要求 DUMP、shell/root UID、当前启动 nonce。不接收任意命令/服务名/文件路径。
-- 私有 `:broker`：应用 UID 的非导出绑定服务，认证后处理操作。用户所选后端启动带 UiAutomationConnection 的 broker instrumentation；每次操作检查全局委托占用，短时委托白名单权限，操作后释放。不能与其他客户占用委托时并发写入。
+- 私有 `:broker`：应用 UID 的非导出绑定服务，认证后处理操作。用户所选后端在主进程启动带 UiAutomationConnection 的 NO_RESTART instrumentation；主进程通过认证会话通知后端，后端再认证独立 broker 的就绪状态；每次操作检查全局委托占用，短时委托白名单权限，操作后释放。不能与其他客户占用委托时并发写入。
 - `adb` 与第一方 JNI：仅 loopback，独立 TLS/ADB 帧与配对状态机；Conscrypt 提供 TLS/exporter，官方 BoringSSL 提供 SPAKE2/HKDF/AES。Keystore 保存不可导出 RSA 私钥，六位码只在内存且及时清零。
 
 ## 事务与恢复

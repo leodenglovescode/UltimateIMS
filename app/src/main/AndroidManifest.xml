@@ -24,5 +24,5 @@
             android:exported="true" android:permission="android.permission.DUMP" />
     </application>
     <instrumentation android:name=".backend.BrokerInstrumentation" android:targetPackage="io.github.leodenglovescode.ultimateims"
-        android:targetProcesses="io.github.leodenglovescode.ultimateims:broker" />
+        android:targetProcesses="io.github.leodenglovescode.ultimateims" />
 </manifest>

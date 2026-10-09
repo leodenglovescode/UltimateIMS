@@ -11,6 +11,7 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
     private int appUid = -1;
     private byte[] secret;
     private IBrokerChannel broker;
+    private volatile IInstrumentationSession instrumentation;
     private final CountDownLatch prepared = new CountDownLatch(1);
     private volatile boolean closed;
     public PrivilegeService() { PlatformMethods.enableAccess(); }
@@ -22,25 +23,48 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
         if (mode == 2 && android.os.Process.myUid() != 0) throw new SecurityException("Root mode requires existing root");
         if (mode < 0 || mode > 2 || (android.os.Process.myUid() != 0 && android.os.Process.myUid() != 2000)) throw new SecurityException("Invalid backend identity");
         appUid = uid; secret = token.clone(); broker = channel;
+        String stage = "client-lifetime";
+        long identity = Binder.clearCallingIdentity();
         try {
+            // 认证完成后才清除入站身份；系统调用必须使用所选后端自身的 shell/root 身份。
             // 应用死亡时让正在执行的 finally 完成（特别是 IMS enable），随后退出。
             clientLife.linkToDeath(() -> { synchronized(PrivilegeService.this) { closed = true; System.exit(0); } },0);
+            stage = "broker-initialization";
             broker.initialize(secret);
+            stage = "delegation-preflight";
             Object am = PlatformMethods.activityManager();
             List<?> occupied = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
-            if (!occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied by another client");
+            if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied by another client");
+            stage = "instrumentation-connection";
             Class<?> uiType = Class.forName("android.app.IUiAutomationConnection");
             Object automation = Class.forName("android.app.UiAutomationConnection").getConstructor().newInstance();
             int flags = PlatformMethods.intField("android.app.ActivityManager", "INSTR_FLAG_NO_RESTART")
                     | PlatformMethods.intField("android.app.ActivityManager", "INSTR_FLAG_DISABLE_HIDDEN_API_CHECKS");
             Bundle arguments = new Bundle(); arguments.putBinder("channel", asBinder()); arguments.putByteArray("secret", secret);
+            stage = "instrumentation-start";
             boolean accepted = (boolean) PlatformMethods.invoke(am, "startInstrumentation", boolean.class,
                     new Class<?>[]{ComponentName.class, String.class, int.class, Bundle.class, Class.forName("android.app.IInstrumentationWatcher"), uiType, int.class, String.class},
                     new ComponentName(Protocol.PACKAGE, BrokerInstrumentation.class.getName()), null, flags, arguments, null, automation, uid / 100000, null);
             if (!accepted) throw new IllegalStateException("Broker instrumentation was rejected");
-        } catch (Exception e) { closed = true; throw new IllegalStateException("Backend preparation failed: " + PlatformMethods.failure(e)); }
+        } catch (Exception e) {
+            closed = true;
+            String detail = "Preparation[" + stage + "]: " + PlatformMethods.failure(e);
+            android.util.Log.e("UltimateIMS", detail);
+            throw new IllegalStateException(detail);
+        } finally { Binder.restoreCallingIdentity(identity); }
     }
-    @Override public void ready(byte[] token) { authenticate(token); prepared.countDown(); }
+    @Override public void ready(byte[] token, IInstrumentationSession session) throws RemoteException {
+        authenticate(token);
+        if (session == null || instrumentation != null) throw new SecurityException("Instrumentation handshake rejected");
+        long identity = Binder.clearCallingIdentity();
+        try {
+            // NO_RESTART 在主进程创建 instrumentation；跨进程握手才能使独立 broker 就绪。
+            broker.ready(token);
+            instrumentation = session;
+            prepared.countDown();
+            android.util.Log.i("UltimateIMS", "Authenticated instrumentation and broker ready");
+        } finally { Binder.restoreCallingIdentity(identity); }
+    }
     @Override public synchronized Bundle invoke(byte[] token, int operation, Bundle args) {
         authenticate(token);
         if (operation < Protocol.SNAPSHOT || operation > Protocol.APN_RESTORE || args == null) throw new IllegalArgumentException("Invalid operation");
@@ -49,14 +73,19 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
         long identity = Binder.clearCallingIdentity();
         try {
             if (!prepared.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Broker readiness timeout; recovery required");
-            if (operation == Protocol.STOP) return broker.execute(token, operation, args);
+            if (operation == Protocol.STOP) {
+                Bundle result = broker.execute(token, operation, args);
+                instrumentation.close(token);
+                instrumentation = null;
+                return result;
+            }
             am = PlatformMethods.activityManager();
             List<?> occupied = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
-            if (!occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied");
+            if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied");
             PlatformMethods.invoke(am, "startDelegateShellPermissionIdentity", void.class, new Class<?>[]{int.class, String[].class}, appUid, Protocol.PERMISSIONS);
             delegated = true;
             List<?> granted = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
-            if (!granted.containsAll(Arrays.asList(Protocol.PERMISSIONS))) throw new SecurityException("Permission delegation was not established");
+            if (granted == null || !granted.containsAll(Arrays.asList(Protocol.PERMISSIONS))) throw new SecurityException("Permission delegation was not established");
             return broker.execute(token, operation, args);
         } catch (Exception e) {
             Bundle failure = new Bundle(); failure.putBoolean("ok", false); failure.putString("error", PlatformMethods.failure(e)); return failure;

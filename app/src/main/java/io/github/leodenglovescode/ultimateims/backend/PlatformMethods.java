@@ -42,13 +42,9 @@ public final class PlatformMethods {
         // Android 13 的 int 与 Android 16 的 void 都不能替代真实原始值回读。
     }
     public static String failure(Exception error) {
-        if (error instanceof NoSuchMethodException || error instanceof NoSuchFieldException || error instanceof ClassNotFoundException) {
-            String name = error.getMessage(); return "Unsupported framework signature: " + (name != null && name.matches("[A-Za-z0-9_.$():, \\[\\]<>-]{1,256}") ? name : error.getClass().getSimpleName());
-        }
-        if (error instanceof SecurityException) return "Permission denied or permission delegation occupied";
-        if (error instanceof UnsupportedOperationException) return "Framework operation is unsupported on this build";
-        return "Framework operation failed: " + error.getClass().getSimpleName();
+        return io.github.leodenglovescode.ultimateims.core.BackendFailure.describe(error);
     }
+
     public static android.os.Bundle attachPrivateBridge(String nonce, android.os.Bundle arguments, int user) throws Exception {
         int uid = android.os.Process.myUid();
         if ((uid != 0 && uid != 2000) || user < 0 || user > 99999) throw new SecurityException("Private bridge identity invalid");
