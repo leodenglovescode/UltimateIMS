@@ -7,6 +7,7 @@ public final class BackendFailure {
     public static String describe(Throwable error) {
         while (error instanceof ExecutionException && error.getCause() != null) error = error.getCause();
         String message = error.getMessage();
+        if (error instanceof IllegalStateException && message != null && (message.equals("Permission denied or permission delegation occupied") || message.equals("Framework operation is unsupported on this build") || message.matches("Framework operation failed: [A-Za-z]+") || message.matches("Unsupported framework signature: [A-Za-z0-9_.$():, \\[\\]<>-]{1,256}"))) return message;
         if (error instanceof IllegalStateException && message != null && message.matches(
                 "Preparation\\[(client-lifetime|broker-initialization|delegation-preflight|instrumentation-connection|instrumentation-start|initial-read)\\]: (Framework operation failed: [A-Za-z]+|Permission denied or permission delegation occupied|Framework operation is unsupported on this build|Unsupported framework signature: [A-Za-z0-9_.$():, \\[\\]<>-]{1,256})")) return message;
         if (error instanceof NoSuchMethodException || error instanceof NoSuchFieldException || error instanceof ClassNotFoundException) {

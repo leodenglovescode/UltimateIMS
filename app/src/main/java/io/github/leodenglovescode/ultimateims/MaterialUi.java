@@ -18,7 +18,7 @@ final class MaterialUi {
     static int color(Context c, int attr) { return MaterialColors.getColor(c,attr,"UltimateIMS"); }
     static LinearLayout column(Context c) { LinearLayout v = new LinearLayout(c); v.setOrientation(LinearLayout.VERTICAL); return v; }
     static void add(LinearLayout parent, View child) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1,-2); params.bottomMargin = dp(parent.getContext(),12); parent.addView(child,params);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1,-2); params.bottomMargin = dp(parent.getContext(),6); parent.addView(child,params);
     }
     static TextView text(Context c, String value, boolean heading) {
         MaterialTextView v = new MaterialTextView(c); v.setText(value);
@@ -29,7 +29,7 @@ final class MaterialUi {
     static LinearLayout card(LinearLayout parent, String title) {
         // 平面分组取代逐项卡片；标题和留白建立层级。
         Context c = parent.getContext(); LinearLayout contents = column(c);
-        contents.setPadding(0,dp(c,12),0,dp(c,4)); add(parent,contents);
+        contents.setPadding(0,dp(c,8),0,dp(c,4)); add(parent,contents);
         if (title != null) add(contents,text(c,title,true)); return contents;
     }
     static void divider(LinearLayout parent) {
@@ -57,18 +57,34 @@ final class MaterialUi {
         ScrollView scroll = new ScrollView(form.getContext()); scroll.setFillViewport(false); scroll.addView(form); return scroll;
     }
     static View row(Context c, String title, String supporting, Runnable action) {
-        LinearLayout row = column(c); row.setPadding(dp(c,16),dp(c,14),dp(c,16),dp(c,14)); row.setMinimumHeight(dp(c,72));
-        TextView label = text(c,title,false); label.setTypeface(null,Typeface.BOLD); label.setTextIsSelectable(false); row.addView(label);
-        TextView detail = text(c,supporting,false); TextViewCompat.setTextAppearance(detail,com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
-        detail.setTextColor(color(c,com.google.android.material.R.attr.colorOnSurfaceVariant)); detail.setTextIsSelectable(false); row.addView(detail);
+        LinearLayout row = new LinearLayout(c); row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0,dp(c,8),0,dp(c,8)); row.setMinimumHeight(dp(c,56));
+        TextView label = text(c,title,false); label.setTextIsSelectable(false);
+        row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        if (supporting != null && !supporting.isBlank()) {
+            TextView detail = text(c,supporting,false); detail.setGravity(android.view.Gravity.END);
+            TextViewCompat.setTextAppearance(detail,com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+            detail.setTextColor(color(c,com.google.android.material.R.attr.colorOnSurfaceVariant)); detail.setTextIsSelectable(false);
+            detail.setMaxWidth(dp(c,180)); detail.setPadding(dp(c,12),0,0,0); row.addView(detail,new LinearLayout.LayoutParams(-2,-2));
+        }
         if (action != null) {
             android.util.TypedValue background = new android.util.TypedValue(); c.getTheme().resolveAttribute(android.R.attr.selectableItemBackground,background,true); row.setBackgroundResource(background.resourceId);
             row.setFocusable(true); row.setClickable(true); row.setOnClickListener(v -> action.run());
             row.setContentDescription(title+". "+supporting+". "+c.getString(R.string.edit));
             row.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-            label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); detail.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            for (int i=0;i<row.getChildCount();i++) row.getChildAt(i).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         }
         return row;
+    }
+    static com.google.android.material.materialswitch.MaterialSwitch switchRow(LinearLayout parent, String title, boolean checked, boolean enabled, java.util.function.Consumer<Boolean> change) {
+        Context c = parent.getContext();
+        var toggle = new com.google.android.material.materialswitch.MaterialSwitch(c);
+        toggle.setText(title); toggle.setMinHeight(dp(c,56)); toggle.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextViewCompat.setTextAppearance(toggle,com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
+        toggle.setChecked(checked); toggle.setEnabled(enabled);
+        toggle.setOnCheckedChangeListener((view,value) -> change.accept(value));
+        parent.addView(toggle,new LinearLayout.LayoutParams(-1,-2));
+        return toggle;
     }
     static final class Choice extends TextInputLayout {
         private final MaterialAutoCompleteTextView field;

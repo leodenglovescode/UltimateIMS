@@ -27,6 +27,8 @@ public final class WorkspaceController {
         history = new AtomicFile(new java.io.File(context.getNoBackupFilesDir(), "history.json"));
     }
     public boolean busy() { return busy || backend.inFlight(); }
+    private volatile String lastFailure;
+    public String failureReason() { return lastFailure; }
     public String status() { return status; }
     public List<String> results() { return results; }
     public Bundle snapshot() { return backend.ready() ? current : null; }
@@ -232,8 +234,18 @@ public final class WorkspaceController {
         if (busy()) { status = "Operation refused: another operation is active or uncertain"; notifyChanged(); return; }
         busy = true; status = description; notifyChanged();
         worker.execute(() -> {
-            try { action.run(); status = "Operation completed; inspect verification evidence"; }
-            catch (Exception e) { current = null; status = "Operation failed or unknown: " + e.getClass().getSimpleName(); android.util.Log.w("UltimateIMS", status); }
+            try { action.run(); lastFailure = null; status = "Operation completed; inspect verification evidence"; }
+            catch (Exception e) {
+                lastFailure = ActionFailure.describe(e);
+                current = null;
+                // 失败的写入/自动恢复不能让连接就绪伪装成读取成功；只重新读取，不重试写入。
+                if (backend.ready() && !backend.inFlight()) {
+                    try { refreshNow(); }
+                    catch (Exception readError) { android.util.Log.w("UltimateIMS","Live refresh after failure: " + ActionFailure.describe(readError)); }
+                }
+                status = "Operation failed or unknown: " + lastFailure;
+                android.util.Log.w("UltimateIMS", status);
+            }
             finally { busy = false; notifyChanged(); }
         });
     }

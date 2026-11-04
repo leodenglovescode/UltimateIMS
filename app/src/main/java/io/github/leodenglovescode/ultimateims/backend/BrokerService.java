@@ -28,6 +28,11 @@ public final class BrokerService extends Service {
             } finally { Binder.restoreCallingIdentity(identity); }
         }
     };
+    @Override public void onCreate() {
+        super.onCreate();
+        // 隐藏 API 豁免按进程生效，不能沿用主进程或 Shizuku 进程中的状态。
+        PlatformMethods.enableAccess();
+    }
     @Override public IBinder onBind(Intent intent) { return channel; }
     @Override public boolean onUnbind(Intent intent) {
         synchronized(channel) { handshake.revoke(); }

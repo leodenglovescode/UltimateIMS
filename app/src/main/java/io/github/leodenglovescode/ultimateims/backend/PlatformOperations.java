@@ -25,7 +25,7 @@ public final class PlatformOperations {
                     if (operation != Protocol.APN_READ) requireConfirmedIdle(sub,args);
                     result.putAll(new ApnOperations(context).execute(operation,sub,args));
                 }
-                case Protocol.IDENTITY -> result.putString("iccid", sim(sub).getIccId());
+                case Protocol.IDENTITY -> result.putString("iccid", identity(sub));
                 case Protocol.READ -> {
                     if (sub != -2) verifySim(sub, args.getString("expectedIccid"));
                     putRaw(result, read(sub, key(args)));
@@ -62,9 +62,10 @@ public final class PlatformOperations {
                 default -> throw new IllegalArgumentException("Unsupported operation");
             }
             result.putBoolean("ok", true);
-        } catch (Exception e) { result.putBoolean("ok", false); result.putString("error", PlatformMethods.failure(e)); }
+        } catch (Exception e) { result.putBoolean("ok", false); result.putString("error", ActionFailure.describe(e)); }
         return result;
     }
+    private static void readFailure(String stage, Exception error) { android.util.Log.w("UltimateIMS", "Read[" + stage + "]: " + PlatformMethods.failure(error)); }
     private ConfigKey key(Bundle arguments) { return ConfigKey.valueOf(arguments.getString("key", "")); }
     // 权限在认证服务内短时委托；拒绝异常由操作边界捕获，不能据此推断值。
     @android.annotation.SuppressLint("MissingPermission")
@@ -73,8 +74,17 @@ public final class PlatformOperations {
         if (active != null) for (SubscriptionInfo info : active) if (info.getSubscriptionId() == sub) return info;
         throw new IllegalStateException("Subscription inactive or unreadable");
     }
+    // ICCID 仅用于安装私有 HMAC 和换卡校验，不显示、不记录、不导出。
+    @android.annotation.SuppressLint({"MissingPermission", "HardwareIds"})
+    private String identity(int sub) {
+        SubscriptionInfo selected = sim(sub);
+        String serial = null;
+        try { serial = context.getSystemService(TelephonyManager.class).createForSubscriptionId(sub).getSimSerialNumber(); }
+        catch (Exception e) { readFailure("sim-serial",e); }
+        return VerifiedSimIdentity.choose(selected.getIccId(),serial);
+    }
     private void verifySim(int sub, String expected) {
-        String current = sim(sub).getIccId();
+        String current = identity(sub);
         if (expected == null || !expected.matches("[0-9]{18,22}[Ff]?") || !expected.equals(current)) throw new SecurityException("SIM identity changed or unavailable");
     }
     private void requireConfirmedIdle(int sub, Bundle args) {
@@ -165,12 +175,13 @@ public final class PlatformOperations {
     @android.annotation.SuppressLint("MissingPermission")
     private Bundle snapshot() throws Exception {
         Bundle result = new Bundle(); ArrayList<Bundle> sims = new ArrayList<>();
+        android.util.Log.i("UltimateIMS", "Read permissions: basic=" + (context.checkSelfPermission("android.permission.READ_PHONE_STATE") == android.content.pm.PackageManager.PERMISSION_GRANTED) + ", privileged=" + (context.checkSelfPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") == android.content.pm.PackageManager.PERMISSION_GRANTED) + ", precise=" + (context.checkSelfPermission("android.permission.READ_PRECISE_PHONE_STATE") == android.content.pm.PackageManager.PERMISSION_GRANTED));
         SubscriptionManager manager = context.getSystemService(SubscriptionManager.class);
         List<SubscriptionInfo> active = manager.getActiveSubscriptionInfoList();
         if (active != null) for (SubscriptionInfo info : active) {
             Bundle item = new Bundle(); int sub = info.getSubscriptionId();
             item.putInt("sub", sub); item.putInt("slot", info.getSimSlotIndex()); item.putString("carrier", info.getCarrierName().toString());
-            item.putString("iccid", info.getIccId()); item.putBoolean("embedded", info.isEmbedded()); item.putBoolean("active", true);
+            try { item.putString("iccid",identity(sub)); } catch (Exception e) { readFailure("sim-identity",e); } item.putBoolean("embedded", info.isEmbedded()); item.putBoolean("active", true);
             item.putBoolean("defaultData", sub == SubscriptionManager.getDefaultDataSubscriptionId());
             TelephonyManager phone = context.getSystemService(TelephonyManager.class).createForSubscriptionId(sub);
             item.putString("country", phone.getSimCountryIso());
@@ -183,7 +194,7 @@ public final class PlatformOperations {
                 try {
                     int code = PlatformMethods.intField("android.telephony.TelephonyManager", "ALLOWED_NETWORK_TYPES_REASON_" + reason);
                     item.putLong("mask_" + reason, phone.getAllowedNetworkTypesForReason(code));
-                } catch (Exception e) { /* 各策略独立读取；一项不可读不阻止其他策略，也不把缺失值视为零。 */ }
+                } catch (Exception e) { readFailure("network-policy-" + reason, e); }
             }
             try { item.putInt("dataRat", phone.getDataNetworkType()); item.putInt("voiceRat", phone.getVoiceNetworkType()); item.putInt("callState", phone.getCallState()); } catch (Exception e) { /* 未知。 */ }
             try {
@@ -195,7 +206,7 @@ public final class PlatformOperations {
                     Object ps = PlatformMethods.invoke(state,"getNetworkRegistrationInfo",NetworkRegistrationInfo.class,new Class<?>[]{int.class,int.class},domain,AccessNetworkConstants.TRANSPORT_TYPE_WWAN);
                     if (ps != null) { item.putBoolean("psRegistered",(boolean)PlatformMethods.invoke(ps,"isNetworkRegistered",boolean.class,new Class<?>[]{})); item.putInt("psRat",(int)PlatformMethods.invoke(ps,"getAccessNetworkTechnology",int.class,new Class<?>[]{})); }
                 }
-            } catch (Exception e) { /* 未知。 */ }
+            } catch (Exception e) { readFailure("radio-registration", e); }
             class DisplayObservation extends TelephonyCallback implements TelephonyCallback.DisplayInfoListener {
                 final CountDownLatch event = new CountDownLatch(1); volatile TelephonyDisplayInfo display;
                 @Override public void onDisplayInfoChanged(TelephonyDisplayInfo value) { display = value; event.countDown(); }
@@ -226,37 +237,59 @@ public final class PlatformOperations {
     // 权限在认证服务内短时委托；拒绝异常由操作边界捕获，不能据此推断值。
     @android.annotation.SuppressLint("MissingPermission")
     private void ims(int sub, Bundle item) {
-        try {
-            Object phone = PlatformMethods.service("phone", "com.android.internal.telephony.ITelephony");
-            item.putBoolean("imsRegistered", (boolean) PlatformMethods.invoke(phone, "isImsRegistered", boolean.class, new Class<?>[]{int.class}, sub));
-            ImsMmTelManager ims = context.getSystemService(android.telephony.ims.ImsManager.class).getImsMmTelManager(sub);
-            CountDownLatch registrationReceived = new CountDownLatch(1);
-            java.util.concurrent.atomic.AtomicInteger registrationTech = new java.util.concurrent.atomic.AtomicInteger(Integer.MIN_VALUE);
-            RegistrationManager.RegistrationCallback registration = new RegistrationManager.RegistrationCallback() {
-                @Override public void onRegistered(ImsRegistrationAttributes attributes) { try { registrationTech.set((int)PlatformMethods.invoke(attributes,"getRegistrationTechnology",int.class,new Class<?>[]{})); } catch (Exception e) { /* 注册技术隐藏接口不可读则保持未知。 */ } registrationReceived.countDown(); }
-                @Override public void onUnregistered(ImsReasonInfo reason) { registrationReceived.countDown(); }
-            };
-            ims.registerImsRegistrationCallback(Runnable::run,registration);
-            try { if (registrationReceived.await(1200,TimeUnit.MILLISECONDS) && registrationTech.get() != Integer.MIN_VALUE) item.putInt("imsRegistrationTech",registrationTech.get()); }
-            finally { ims.unregisterImsRegistrationCallback(registration); }
+        Object phone = null;
+        try { phone = PlatformMethods.service("phone", "com.android.internal.telephony.ITelephony"); }
+        catch (Exception e) { readFailure("ims-service",e); }
+        if (phone != null) {
+            try { item.putBoolean("imsRegistered", (boolean) PlatformMethods.invoke(phone,"isImsRegistered",boolean.class,new Class<?>[]{int.class},sub)); }
+            catch (Exception e) { readFailure("ims-registration-legacy",e); }
             try {
                 int nr = PlatformMethods.intField("android.telephony.ims.stub.ImsRegistrationImplBase","REGISTRATION_TECH_NR");
                 item.putBoolean("voiceOverNrCapable",(boolean)PlatformMethods.invoke(phone,"isCapable",boolean.class,new Class<?>[]{int.class,int.class,int.class},sub,MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE,nr));
                 item.putBoolean("voiceOverNrAvailable",(boolean)PlatformMethods.invoke(phone,"isAvailable",boolean.class,new Class<?>[]{int.class,int.class,int.class},sub,MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE,nr));
-            } catch (Exception e) { /* 缺少按注册技术查询接口时保持未知，不用总 voice 能力替代。 */ }
+            } catch (Exception e) { readFailure("vonr-capability",e); }
+        }
+        ImsMmTelManager ims;
+        try { ims = context.getSystemService(android.telephony.ims.ImsManager.class).getImsMmTelManager(sub); }
+        catch (Exception e) { readFailure("ims-manager",e); return; }
+        // 公共异步状态、传输类型和能力互不阻塞；旧隐藏方法失败不能抹掉其余观测。
+        try {
+            CountDownLatch stateReceived = new CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicInteger state = new java.util.concurrent.atomic.AtomicInteger(-1);
+            ims.getRegistrationState(Runnable::run,value -> { state.set(value); stateReceived.countDown(); });
+            if (stateReceived.await(1200,TimeUnit.MILLISECONDS) && state.get() != -1) item.putBoolean("imsRegistered",state.get() == RegistrationManager.REGISTRATION_STATE_REGISTERED);
+        } catch (Exception e) { readFailure("ims-registration-state",e); }
+        try {
+            CountDownLatch registrationReceived = new CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicInteger technology = new java.util.concurrent.atomic.AtomicInteger(Integer.MIN_VALUE);
+            RegistrationManager.RegistrationCallback registration = new RegistrationManager.RegistrationCallback() {
+                @Override public void onRegistered(ImsRegistrationAttributes attributes) {
+                    try { technology.set((int)PlatformMethods.invoke(attributes,"getRegistrationTechnology",int.class,new Class<?>[]{})); }
+                    catch (Exception e) { readFailure("ims-registration-technology",e); }
+                    registrationReceived.countDown();
+                }
+                @Override public void onUnregistered(ImsReasonInfo reason) { registrationReceived.countDown(); }
+            };
+            ims.registerImsRegistrationCallback(Runnable::run,registration);
+            try { if (registrationReceived.await(1200,TimeUnit.MILLISECONDS) && technology.get() != Integer.MIN_VALUE) item.putInt("imsRegistrationTech",technology.get()); }
+            finally { ims.unregisterImsRegistrationCallback(registration); }
+        } catch (Exception e) { readFailure("ims-registration-callback",e); }
+        try {
             CountDownLatch received = new CountDownLatch(1);
             ImsMmTelManager.CapabilityCallback callback = new ImsMmTelManager.CapabilityCallback() {
                 @Override public void onCapabilitiesStatusChanged(MmTelFeature.MmTelCapabilities caps) {
-                    synchronized (item) { item.putBoolean("voice", caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE)); item.putBoolean("video", caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO)); item.putBoolean("ut", caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_UT)); }
+                    synchronized(item) { item.putBoolean("voice",caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE)); item.putBoolean("video",caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VIDEO)); item.putBoolean("ut",caps.isCapable(MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_UT)); }
                     received.countDown();
                 }
             };
-            ims.registerMmTelCapabilityCallback(Runnable::run, callback);
-            try { received.await(1200, TimeUnit.MILLISECONDS); } finally { ims.unregisterMmTelCapabilityCallback(callback); }
-            CountDownLatch transport = new CountDownLatch(1);
-            java.util.concurrent.atomic.AtomicInteger observedTransport = new java.util.concurrent.atomic.AtomicInteger(-1);
-            ims.getRegistrationTransportType(Runnable::run, value -> { observedTransport.set(value); transport.countDown(); });
-            if (transport.await(1200, TimeUnit.MILLISECONDS)) item.putInt("imsTransport", observedTransport.get());
-        } catch (Exception e) { /* 无事件不代表 false。 */ }
+            ims.registerMmTelCapabilityCallback(Runnable::run,callback);
+            try { received.await(1200,TimeUnit.MILLISECONDS); } finally { ims.unregisterMmTelCapabilityCallback(callback); }
+        } catch (Exception e) { readFailure("ims-capability-callback",e); }
+        try {
+            CountDownLatch received = new CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicInteger transport = new java.util.concurrent.atomic.AtomicInteger(-1);
+            ims.getRegistrationTransportType(Runnable::run,value -> { transport.set(value); received.countDown(); });
+            if (received.await(1200,TimeUnit.MILLISECONDS) && transport.get() != -1) item.putInt("imsTransport",transport.get());
+        } catch (Exception e) { readFailure("ims-transport",e); }
     }
 }

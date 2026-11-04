@@ -38,7 +38,8 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
             Object am = PlatformMethods.activityManager();
             delegation = new DelegationMethods(am);
             android.util.Log.i("UltimateIMS", delegation.uidScopedStop() ? "Permission release signature: UID scoped" : "Permission release signature: legacy");
-            List<?> occupied = delegation.permissions();
+            android.util.Log.i("UltimateIMS", delegation.uidScopedRead() ? "Permission query signature: UID scoped" : "Permission query signature: legacy");
+            List<?> occupied = delegation.permissions(appUid);
             if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied by another client");
             stage = "instrumentation-connection";
             Class<?> uiType = Class.forName("android.app.IUiAutomationConnection");
@@ -83,11 +84,11 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
                 instrumentation = null;
                 return result;
             }
-            List<?> occupied = delegation.permissions();
+            List<?> occupied = delegation.permissions(appUid);
             if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied");
             delegation.start(appUid, Protocol.PERMISSIONS);
             delegated = true;
-            List<?> granted = delegation.permissions();
+            List<?> granted = delegation.permissions(appUid);
             if (granted == null || !granted.containsAll(Arrays.asList(Protocol.PERMISSIONS))) throw new SecurityException("Permission delegation was not established");
             return broker.execute(token, operation, args);
         } catch (Exception e) {

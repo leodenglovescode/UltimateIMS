@@ -36,10 +36,33 @@ public class DelegationMethodsTest {
     public static class WrongReturn extends Legacy {
         public boolean stopDelegateShellPermissionIdentity(int uid) { return true; }
     }
+    public static class AllScoped {
+        int readUid, stopUid;
+        List<String> permissions = List.of();
+        public void startDelegateShellPermissionIdentity(int uid, String[] names) { permissions = List.of(names); }
+        public List<String> getDelegatedShellPermissions(int uid) { readUid = uid; return permissions; }
+        public void stopDelegateShellPermissionIdentity(int uid) { stopUid = uid; permissions = List.of(); }
+    }
+    public static class DeniedRead extends Base {
+        int legacyReads;
+        public List<String> getDelegatedShellPermissions(int uid) { throw new SecurityException("Denied"); }
+        @Override public List<String> getDelegatedShellPermissions() { legacyReads++; return List.of(); }
+        public void stopDelegateShellPermissionIdentity(int uid) { }
+    }
+    @Test public void actualPixelSignatureSetUsesFullUidForReadAndRelease() throws Exception {
+        AllScoped service = new AllScoped(); DelegationMethods methods = new DelegationMethods(service);
+        assertTrue(methods.uidScopedRead()); methods.start(1012345,new String[]{"allowed"});
+        assertEquals(List.of("allowed"), methods.permissions(1012345)); assertEquals(1012345,service.readUid);
+        methods.stop(1012345); assertEquals(1012345,service.stopUid); assertEquals(1012345,service.readUid);
+    }
+    @Test public void failedUidReadDoesNotFallBackToGlobalRead() throws Exception {
+        DeniedRead service = new DeniedRead(); DelegationMethods methods = new DelegationMethods(service);
+        assertThrows(SecurityException.class, () -> methods.permissions(10001)); assertEquals(0,service.legacyReads);
+    }
     @Test public void oldFirmwareReleasesAndVerifies() throws Exception {
         Legacy service = new Legacy(); DelegationMethods methods = new DelegationMethods(service);
         assertFalse(methods.uidScopedStop()); methods.start(10001, new String[]{"allowed"});
-        assertEquals(List.of("allowed"), methods.permissions()); methods.stop(10001); assertEquals(1, service.stops);
+        assertEquals(List.of("allowed"), methods.permissions(10001)); methods.stop(10001); assertEquals(1, service.stops);
     }
     @Test public void newFirmwareReceivesExactAppUid() throws Exception {
         Scoped service = new Scoped(); DelegationMethods methods = new DelegationMethods(service);

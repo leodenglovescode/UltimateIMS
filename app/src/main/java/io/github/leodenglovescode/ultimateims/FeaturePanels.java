@@ -43,7 +43,7 @@ final class FeaturePanels {
         saved.putString("identity",digest == null ? "unverified" : digest); return saved;
     }
     void restoreState(Bundle saved) {
-        if (saved == null) return; searchQuery = saved.getString("search",""); allSims = saved.getBoolean("allSims"); unpack(saved.getBundle("draft"),draft); unpack(saved.getBundle("portalDraft"),portalDraft); draftSub = saved.getInt("draftSub",-1); restoredIdentity = saved.getString("identity","unverified"); exportText = saved.getString("export");
+        if (saved == null) return; searchQuery = saved.getString("search",""); allSims = saved.getBoolean("allSims"); unpack(saved.getBundle("draft"),draft); unpack(saved.getBundle("portalDraft"),portalDraft); draftSub = saved.getInt("draftSub",-1); restoredIdentity = saved.getString("identity","unverified"); exportText = saved.getString("export"); if (draft.isEmpty()) restoredIdentity = null;
     }
     private Bundle pack(Map<ConfigKey,RawValue> values) {
         Bundle packed = new Bundle(); for (var item : values.entrySet()) { Bundle value = new Bundle(); value.putString("kind",item.getValue().kind().name()); value.putString("value",item.getValue().payload()); packed.putBundle(item.getKey().name(),value); } return packed;
@@ -60,7 +60,15 @@ final class FeaturePanels {
         boolean primary = label == R.string.apply || label == R.string.backend_start || label == R.string.portal_apply;
         var v = MaterialUi.button(activity,label,() -> safe(action),primary); v.setEnabled(enabled); MaterialUi.add(body,v);
     }
-    private void safe(Runnable action) { try { action.run(); } catch (Exception e) { localLog = "Operation refused: " + e.getClass().getSimpleName(); Toast.makeText(activity,R.string.parse_error,Toast.LENGTH_LONG).show(); redraw.run(); } }
+    private void safe(Runnable action) {
+        try { action.run(); }
+        catch (Exception error) {
+            localLog = "Operation refused: " + ActionFailure.describe(error);
+            android.util.Log.w("UltimateIMS",localLog);
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.action_failed).setMessage(localLog).setPositiveButton(R.string.confirm,null).show();
+            redraw.run();
+        }
+    }
     private boolean writable() { return workspace.backend.ready() && !workspace.busy(); }
     String label(ConfigKey key) { return str(switch(key) {
         case VOLTE -> R.string.key_volte;
@@ -120,7 +128,7 @@ final class FeaturePanels {
         body = previous;
     }
     void ims() {
-        section(R.string.draft_section); text(str(R.string.draft));
+        section(R.string.draft_section);
         button(R.string.presets, () -> {
             String[] names = {str(R.string.preset_recommended),str(R.string.preset_china_5g),str(R.string.preset_china_lte),str(R.string.preset_calling_available)};
             new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.presets).setItems(names,(d,n) -> { bindDraftIdentity(); draft.clear(); draft.putAll(Presets.build(Presets.Name.values()[n],Build.VERSION.SDK_INT)); redraw.run(); }).show();
@@ -141,12 +149,19 @@ final class FeaturePanels {
     }
     private void draftActions() {
         section(R.string.review_section); text(activity.getString(R.string.draft_count,draft.size()));
-        CheckBox all = new com.google.android.material.checkbox.MaterialCheckBox(activity); all.setText(R.string.all_sims); all.setChecked(allSims); all.setMinHeight(MaterialUi.dp(activity,56));
-        all.setOnCheckedChangeListener((view,checked) -> allSims = checked); MaterialUi.add(body,all);
+        MaterialUi.switchRow(body,str(R.string.all_sims),allSims,!workspace.busy(),checked -> allSims = checked);
         button(R.string.apply, () -> {
             Bundle selected = workspace.selected(sub);
-            if (restoredIdentity != null) { if (selected == null || !restoredIdentity.equals(draftDigest(selected.getString("iccid")))) throw new SecurityException("Restored draft identity must be reviewed"); bindDraftIdentity(); }
-            if (draftSub != sub || (draftIccid != null && (selected == null || !draftIccid.equals(selected.getString("iccid"))))) { throw new IllegalStateException("SIM draft identity changed"); }
+            if (selected == null) throw new SecurityException("Verified SIM identity unavailable");
+            String selectedDigest = draftDigest(selected.getString("iccid"));
+            boolean needsBinding = (restoredIdentity != null && !restoredIdentity.equals(selectedDigest)) || draftSub != sub || (draftIccid != null && !draftIccid.equals(selected.getString("iccid")));
+            if (needsBinding) {
+                // 旧草稿或换卡必须明确审阅目标；本次确认只绑定草稿，绝不直接写入。
+                String target = activity.getString(R.string.sim,selected.getInt("slot")+1,selected.getString("carrier"),str(selected.getBoolean("embedded") ? R.string.esim : R.string.physical));
+                confirm(target + "\n\n" + str(R.string.draft_review_confirm),() -> { bindDraftIdentity(); redraw.run(); });
+                return;
+            }
+            if (restoredIdentity != null) bindDraftIdentity();
             List<Integer> targets = allSims ? workspace.sims().stream().map(s -> s.getInt("sub")).collect(java.util.stream.Collectors.toList()) : List.of(sub);
             StringBuilder review = new StringBuilder(activity.getString(R.string.apply_confirm,draft.size(),targets.size()));
             for (var change : draft.entrySet()) review.append("\n\n").append(label(change.getKey())).append("\n").append(value(workspace.currentValue(sub,change.getKey()))).append(" → ").append(value(change.getValue()));
@@ -162,33 +177,34 @@ final class FeaturePanels {
     private boolean radioKey(ConfigKey key) { return EnumSet.of(ConfigKey.VOLTE,ConfigKey.VOWIFI,ConfigKey.VONR,ConfigKey.VT,ConfigKey.CROSS_SIM,ConfigKey.UT,ConfigKey.LTE,ConfigKey.NR_AVAILABILITY).contains(key); }
     void radio() {
         section(R.string.registration_section);
-        if (workspace.snapshot() != null) text(str(R.string.observed_at)+" "+new java.util.Date(workspace.snapshot().getLong("observedAt")));
         Bundle observed = workspace.selected(sub);
-        for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","psRegistered","psRat")) {
-            Object raw = observed == null || !observed.containsKey(key) ? null : observed.get(key);
-            String display = raw == null ? str(R.string.unknown) : raw instanceof Boolean flag ? str(flag ? R.string.yes : R.string.no) : String.valueOf(raw);
-            if (raw instanceof Integer number) {
-                if (key.equals("imsTransport")) display = number == 1 ? str(R.string.cellular) : number == 2 ? str(R.string.wifi) : str(R.string.unknown);
-                if (key.equals("psRat")) display = number == 13 ? "LTE" : number == 20 ? "5G NR" : String.valueOf(number);
-                if (key.equals("imsRegistrationTech")) display = switch (number) { case 0 -> "LTE"; case 1 -> str(R.string.wifi); case 2 -> str(R.string.key_cross_sim); case 3 -> "5G NR"; default -> str(R.string.unknown); };
-            }
-            MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),display,null));
-        }
-        if (observed != null) {
+        if (observed == null) {
+            text(str(workspace.backend.ready() ? R.string.live_read_unavailable : R.string.connect_to_read));
+        } else {
+            String registered = !observed.containsKey("imsRegistered") ? str(R.string.unknown) : str(observed.getBoolean("imsRegistered") ? R.string.registered : R.string.not_registered);
+            MaterialUi.add(body,MaterialUi.row(activity,str(R.string.diag_ims_registered),registered,null));
+            String transport = !observed.containsKey("imsTransport") ? str(R.string.unknown) : str(observed.getInt("imsTransport") == 2 ? R.string.wifi : observed.getInt("imsTransport") == 1 ? R.string.cellular : R.string.unknown);
+            MaterialUi.add(body,MaterialUi.row(activity,str(R.string.diag_ims_transport),transport,null));
             var radio = RadioObservation.classify(observed.containsKey("psRegistered") ? observed.getBoolean("psRegistered") : null,observed.containsKey("psRat") ? observed.getInt("psRat") : null,observed.containsKey("nrConnected") ? observed.getBoolean("nrConnected") : null);
-            text(str(radio == RadioObservation.State.NR_SA ? R.string.nr_sa_observed : radio == RadioObservation.State.NR_NSA ? R.string.nr_nsa_observed : R.string.nr_registration_unknown));
+            String network = radio == RadioObservation.State.NR_SA ? "5G SA" : radio == RadioObservation.State.NR_NSA ? "5G NSA" : observed.containsKey("psRat") && observed.getInt("psRat") == 13 ? "LTE" : str(R.string.unknown);
+            MaterialUi.add(body,MaterialUi.row(activity,str(R.string.network_status),network,null));
         }
-        text(str(R.string.observation_note));
-        section(R.string.radio_controls); text(str(R.string.toggle_draft_note));
+        section(R.string.radio_controls);
         for (ConfigKey key : ConfigKey.values()) if (radioKey(key) && Build.VERSION.SDK_INT >= key.minApi) {
             if (key == ConfigKey.NR_AVAILABILITY) { nrSwitch(1,R.string.nr_nsa_toggle); nrSwitch(2,R.string.nr_sa_toggle); }
             else toggleRow(body,key);
         }
-        draftActions();
+        if (!draft.isEmpty()) draftActions();
     }
     private void saveToggle(ConfigKey key, RawValue target) {
         if (!draft.isEmpty() && draftSub != sub) throw new SecurityException("Review the draft for this SIM before editing");
-        if (restoredIdentity != null) { Bundle selected = workspace.selected(sub); if (selected == null || !restoredIdentity.equals(draftDigest(selected.getString("iccid")))) throw new SecurityException("Draft identity changed"); }
+        if (DraftBinding.requiresRestoredIdentity(!draft.isEmpty(),restoredIdentity)) {
+            Bundle selected = workspace.selected(sub);
+            DraftBinding.verifyRestored(restoredIdentity,selected == null ? null : draftDigest(selected.getString("iccid")));
+        }
+        Bundle liveSim = workspace.selected(sub);
+        if (liveSim == null) throw new SecurityException("Verified SIM identity unavailable");
+        draftDigest(liveSim.getString("iccid"));
         key.validate(target,Build.VERSION.SDK_INT); bindDraftIdentity();
         if (target.equals(workspace.currentValue(sub,key))) draft.remove(key); else draft.put(key,target);
         redraw.run();
@@ -196,28 +212,20 @@ final class FeaturePanels {
     private void toggleRow(LinearLayout parent, ConfigKey key) {
         RawValue current = workspace.currentValue(sub,key), shown = draft.getOrDefault(key,current);
         ConfigurationToggle.State state = ConfigurationToggle.state(key,shown);
-        String currentLabel = key.scope == ConfigKey.Scope.SUBSCRIPTION && current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1") ? str(R.string.preference_default) : value(current);
-        String detail = activity.getString(R.string.live_value,currentLabel) + (draft.containsKey(key) ? "\n"+activity.getString(R.string.draft_value,value(shown)) : "");
-        LinearLayout row = MaterialUi.column(activity); row.setPadding(0,MaterialUi.dp(activity,8),0,MaterialUi.dp(activity,8));
-        var toggle = new com.google.android.material.materialswitch.MaterialSwitch(activity); toggle.setText(label(key)); toggle.setMinHeight(MaterialUi.dp(activity,56));
-        toggle.setChecked(state == ConfigurationToggle.State.ON); toggle.setEnabled(!workspace.busy() && state != ConfigurationToggle.State.UNKNOWN);
+        String title = label(key) + (draft.containsKey(key) ? " •" : "");
+        if (state == ConfigurationToggle.State.UNKNOWN) title += " · " + str(current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1") ? R.string.preference_default : R.string.unknown);
+        var toggle = MaterialUi.switchRow(parent,title,state == ConfigurationToggle.State.ON,!workspace.busy() && (state != ConfigurationToggle.State.UNKNOWN || (current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1"))),enabled -> safe(() -> saveToggle(key,ConfigurationToggle.target(key,enabled))));
         toggle.setStateDescription(state == ConfigurationToggle.State.UNKNOWN ? str(R.string.unknown) : str(state == ConfigurationToggle.State.ON ? R.string.true_value : R.string.false_value));
-        toggle.setOnCheckedChangeListener((view,enabled) -> safe(() -> saveToggle(key,ConfigurationToggle.target(key,enabled)))); MaterialUi.add(row,toggle);
-        TextView supporting = MaterialUi.text(activity,detail,false); androidx.core.widget.TextViewCompat.setTextAppearance(supporting,com.google.android.material.R.style.TextAppearance_Material3_BodyMedium); MaterialUi.add(row,supporting);
-        if (state == ConfigurationToggle.State.UNKNOWN) {
-            var choose = MaterialUi.button(activity,R.string.choose_toggle,() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(label(key)).setItems(new String[]{str(R.string.true_value),str(R.string.false_value)},(d,index) -> safe(() -> saveToggle(key,ConfigurationToggle.target(key,index == 0)))).show(),false);
-            choose.setEnabled(!workspace.busy()); MaterialUi.add(row,choose);
-        }
-        MaterialUi.add(parent,row); MaterialUi.divider(parent);
+        toggle.setTooltipText(activity.getString(R.string.live_value,value(current)));
+        MaterialUi.divider(parent);
     }
     private void nrSwitch(int technology, int label) {
         RawValue current = workspace.currentValue(sub,ConfigKey.NR_AVAILABILITY), shown = draft.getOrDefault(ConfigKey.NR_AVAILABILITY,current);
         ConfigurationToggle.State state = ConfigurationToggle.nrState(shown,technology);
-        var toggle = new com.google.android.material.materialswitch.MaterialSwitch(activity); toggle.setText(label); toggle.setMinHeight(MaterialUi.dp(activity,56));
-        toggle.setChecked(state == ConfigurationToggle.State.ON); toggle.setEnabled(!workspace.busy() && state != ConfigurationToggle.State.UNKNOWN);
+        String title = str(label) + (draft.containsKey(ConfigKey.NR_AVAILABILITY) ? " •" : "") + (state == ConfigurationToggle.State.UNKNOWN ? " · " + str(R.string.unknown) : "");
+        var toggle = MaterialUi.switchRow(body,title,state == ConfigurationToggle.State.ON,!workspace.busy() && state != ConfigurationToggle.State.UNKNOWN,enabled -> safe(() -> saveToggle(ConfigKey.NR_AVAILABILITY,ConfigurationToggle.nrTarget(draft.getOrDefault(ConfigKey.NR_AVAILABILITY,current),technology,enabled))));
         toggle.setStateDescription(state == ConfigurationToggle.State.UNKNOWN ? str(R.string.unknown) : str(state == ConfigurationToggle.State.ON ? R.string.true_value : R.string.false_value));
-        toggle.setOnCheckedChangeListener((view,enabled) -> safe(() -> saveToggle(ConfigKey.NR_AVAILABILITY,ConfigurationToggle.nrTarget(draft.getOrDefault(ConfigKey.NR_AVAILABILITY,current),technology,enabled))));
-        MaterialUi.add(body,toggle); text(activity.getString(R.string.live_value,value(current))+(draft.containsKey(ConfigKey.NR_AVAILABILITY)?"\n"+activity.getString(R.string.draft_value,value(shown)):"")); MaterialUi.divider(body);
+        MaterialUi.divider(body);
     }
     private int group(ConfigKey key) {
         return switch (key) {
@@ -282,16 +290,17 @@ final class FeaturePanels {
     }
     private void confirm(String message, Runnable action) { new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setMessage(message).setNegativeButton(R.string.cancel,null).setPositiveButton(R.string.confirm,(d,n) -> safe(action)).show(); }
     void settings(BackendSession.Mode chosen) {
-        status(); section(R.string.backend_section);
-        button(R.string.backend_start, () -> workspace.backend.start(Objects.requireNonNull(chosen)),chosen != null && !workspace.busy() && !workspace.backend.bound());
-        button(R.string.backend_stop,workspace.backend::stop,workspace.backend.bound() && !workspace.busy());
+        section(R.string.backend_section);
+        MaterialUi.switchRow(body,str(R.string.connection_switch),workspace.backend.bound(),chosen != null && !workspace.busy() && !workspace.backend.inFlight(),enabled -> safe(() -> { if (enabled) workspace.backend.start(chosen); else workspace.backend.stop(); }));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.connection_status),str(workspace.backend.ready() ? R.string.connection_ready : R.string.connection_not_ready),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.connection_status).setMessage(workspace.backend.state()).setPositiveButton(R.string.confirm,null).show()));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.read_status),str(workspace.snapshot() == null ? R.string.read_unavailable : R.string.read_ready),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.read_status).setMessage(workspace.failureReason() == null ? workspace.status() : workspace.failureReason()).setPositiveButton(R.string.confirm,null).show()));
         if (chosen == BackendSession.Mode.EMBEDDED_ADB) { section(R.string.wireless_section); text(str(R.string.pair_help));
         button(R.string.pair, () -> wireless(true), workspace.backend.mode() == BackendSession.Mode.EMBEDDED_ADB && !workspace.busy());
         button(R.string.connect_adb, () -> wireless(false), workspace.backend.mode() == BackendSession.Mode.EMBEDDED_ADB && !workspace.busy());
         }
         section(R.string.automation_section);
-        CheckBox reapply = new com.google.android.material.checkbox.MaterialCheckBox(activity); reapply.setText(R.string.auto_reapply); reapply.setChecked(workspace.autoRestoreEnabled()); reapply.setEnabled(!workspace.busy());
-        reapply.setOnCheckedChangeListener((v, checked) -> workspace.setAutoRestore(checked)); reapply.setMinHeight(MaterialUi.dp(activity,56)); MaterialUi.add(body,reapply); text(str(R.string.auto_explain));
+        MaterialUi.switchRow(body,str(R.string.auto_reapply),workspace.autoRestoreEnabled(),!workspace.busy(),enabled -> workspace.setAutoRestore(enabled)).setTooltipText(str(R.string.auto_explain));
+
     }
     void about() {
         section(R.string.licenses);
@@ -382,6 +391,9 @@ final class FeaturePanels {
     void diagnostics() {
         section(R.string.registration_section); Bundle observed = workspace.selected(sub);
         if (observed != null) {
+            text(activity.getString(R.string.default_data,str(observed.getBoolean("defaultData") ? R.string.yes : R.string.no)));
+            text(activity.getString(R.string.sim_country,observed.getString("country",str(R.string.unknown))));
+            text(activity.getString(R.string.rat,observed.containsKey("dataRat") ? Integer.toString(observed.getInt("dataRat")) : str(R.string.unknown)));
             for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","nrState","nrConnected","psRegistered","psRat","displayBaseRat","displayOverride","dataRat","voiceRat","callState")) MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),String.valueOf(observed.containsKey(key) ? observed.get(key) : str(R.string.unknown)),null));
             Long user = observed.containsKey("mask_USER") ? observed.getLong("mask_USER") : null;
             Long power = observed.containsKey("mask_POWER") ? observed.getLong("mask_POWER") : null;

@@ -37,3 +37,13 @@ Shizuku 预检和授权在绑定私有 broker 前完成；缺少服务、拒绝�
 0.4.0-dev 构建、lint 与 49 个核心测试通过，中英 246 个键/占位符匹配；APK 签名和 16KB 对齐检查通过。安装升级返回成功，已读取安装版本；没有启动新版或继续设备测试。系统主题、布局、TalkBack、双卡注册与实际后端仍待真机验收。
 
 官方依据：[Material 色彩角色](https://m3.material.io/styles/color/the-color-system)、[Android 深色主题](https://developer.android.com/develop/ui/views/theming/darktheme)、[Android 可访问性](https://developer.android.com/guide/topics/ui/accessibility/apps)、[Shizuku API 指南](https://github.com/RikkaApps/Shizuku-API/blob/master/README.md)。
+
+## 0.5.3-dev 紧凑列表
+
+应用显示名称为 Ultimate IMS。所有布尔选项使用一行 MaterialSwitch 胶囊开关，正常 56dp 触控高度；不再为每项显示当前值段落、独立卡片或“选择启用/停用”按钮。未知字段明确标注且禁用；已知 -1 用户默认值可明确选择新草稿值。未选择的默认值不写成关闭。值域不是布尔的偏好、阈值、端点仍用可编辑行/对话框，避免用开关伪装数字或枚举。
+
+首页仅显示 IMS、连接类型、实际移动网络三项摘要；能力、注册技术、默认数据卡、区域和原始网络信息移到连接详情。后端选择为下拉行、连接与自动恢复为开关；单独显示实时读取可用性，错误详情按需打开。详细限制保留在诊断、工具和确认窗口。
+
+旧草稿缺少可核验的绑定或目标 SIM 改变时，Review changes 先展示目标 SIM 并要求明确确认；第一次确认不执行配置写入。原值与恢复日志不随 UI 精简删除。系统主题、语言机制保持不变。
+
+0.5.0 紧凑暗色界面在设备截图中检查，实际 switch 行高 168px/56dp，未点开网络配置开关。最终 0.5.3 只安装，视觉变化及完整中英文/大字体/TalkBack 尚未真机验收。

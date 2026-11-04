@@ -173,7 +173,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         int previousScroll = renderedPage == page && renderedSub == selectedSub ? scroll.getScrollY() : 0;
         View focus = getCurrentFocus(); boolean searchFocused = focus != null && "config_search".equals(focus.getTag());
         int searchPosition = searchFocused ? ((EditText)focus).getSelectionStart() : -1;
-        body = content; body.removeAllViews(); toolbar.setTitle(new int[]{R.string.nav_home,R.string.nav_ims,R.string.nav_diagnostics,R.string.nav_network,R.string.nav_tools,R.string.nav_settings}[page]);
+        body = content; body.removeAllViews(); toolbar.setTitle(R.string.app_name); toolbar.setSubtitle(new int[]{R.string.nav_home,R.string.nav_ims,R.string.nav_diagnostics,R.string.nav_network,R.string.nav_tools,R.string.nav_settings}[page]);
         if (drawerNavigation != null) drawerNavigation.setCheckedItem(300+(page == 2 ? 0 : page));
         if (page < 5) navigation.getMenu().findItem(100+(page == 2 ? 0 : page)).setChecked(true);
         else for (int i=0;i<navigation.getMenu().size();i++) navigation.getMenu().getItem(i).setChecked(false);
@@ -182,7 +182,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             if (searchFocused && page == 1) { View replacement = content.findViewWithTag("config_search"); if (replacement instanceof EditText input) { input.requestFocus(); input.setSelection(Math.min(Math.max(0,searchPosition),input.length())); } }
             scroll.scrollTo(0,previousScroll);
         });
-        text(getString(new int[]{R.string.intro_home,R.string.intro_ims,R.string.intro_diagnostics,R.string.intro_network,R.string.intro_tools,R.string.intro_settings}[page]),false);
+
         if (page == 5) { settings(); return; }
 
         if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) button(R.string.permission, () -> requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, 1));
@@ -195,17 +195,6 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (page == 0) {
             privilegedSimSelector(); panels.attach(content,selectedSub);
             if (!workspace.backend.ready()) button(R.string.connect_settings,this::openConfigurationPage);
-            heading(R.string.sim_status);
-            if (snapshot == null) text(getString(reading ? R.string.loading : R.string.error_read),false);
-            if (snapshot != null) {
-                if (snapshot.sims().isEmpty()) text(getString(R.string.no_sims),false);
-                var sim = snapshot.sims().stream().filter(item -> item.subId() == selectedSub).findFirst().orElse(null);
-                if (sim != null) {
-                    text(getString(R.string.default_data,bool(sim.defaultData())),false);
-                    text(getString(R.string.sim_country,sim.country() == null || sim.country().isEmpty() ? unknown() : sim.country()),false);
-                    text(getString(R.string.rat,sim.dataRat() == null || sim.dataRat() == 0 ? unknown() : rat(sim.dataRat())),false);
-                }
-            }
             panels.radio(); body = content; button(R.string.diagnostics,() -> navigate(2));
             heading(R.string.device_section);
             text(getString(R.string.device,Build.MODEL,Build.VERSION.RELEASE,Build.VERSION.SDK_INT),false);
@@ -259,13 +248,13 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         body = content; heading(R.string.privacy_section); text(getString(R.string.privacy),false);
     }
     private void backendSetup() {
-        heading(R.string.backend_section);
-        text(getString(R.string.backend,backendName()),false);
-        button(R.string.backend_choose, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.backend_choose)
-                .setItems(new String[]{getString(R.string.shizuku), getString(R.string.adb), getString(R.string.root)}, (d, index) -> {
-                    if (workspace.busy() || workspace.backend.bound()) { Toast.makeText(this,R.string.busy,Toast.LENGTH_LONG).show(); return; }
-                    getPreferences(MODE_PRIVATE).edit().putString("selected_backend", BackendSession.Mode.values()[index].name()).apply(); render();
-                }).show());
+        BackendSession.Mode chosen = chosenBackend();
+        String[] labels = {getString(R.string.backend_none),getString(R.string.shizuku),getString(R.string.adb),getString(R.string.root)};
+        MaterialUi.Choice choice = new MaterialUi.Choice(this,getString(R.string.backend_choose),java.util.Arrays.asList(labels),chosen == null ? 0 : chosen.ordinal()+1,index -> {
+            if (workspace.busy() || workspace.backend.bound()) { Toast.makeText(this,R.string.busy,Toast.LENGTH_LONG).show(); render(); return; }
+            getPreferences(MODE_PRIVATE).edit().putString("selected_backend",index == 0 ? "" : BackendSession.Mode.values()[index-1].name()).apply(); render();
+        });
+        choice.setEnabled(!workspace.backend.bound() && !workspace.busy()); MaterialUi.add(body,choice);
         panels.attach(content,selectedSub); panels.settings(chosenBackend());
     }
     BackendSession.Mode chosenBackend() {
