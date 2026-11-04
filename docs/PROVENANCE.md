@@ -5,3 +5,5 @@ UltimateIMS 使用独立 applicationId 与架构。需求参考公开 IMS 工具
 标准依赖从官方来源获取并保留许可证。具体功能完成度以本提交源码为准，不以开发记录或开关代替设备通信验证。
 
 为比较兼容行为，已检查 Carrier IMS 与 TensorIMS 的部分实现；未复制或移植实现代码，不使用 clean-room 声明。
+
+参考实现的历史调用路径与配置差异见 NR_RESELECTION_COMPARISON.md。
