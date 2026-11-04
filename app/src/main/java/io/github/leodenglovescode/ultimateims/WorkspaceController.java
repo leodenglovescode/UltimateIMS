@@ -103,23 +103,43 @@ public final class WorkspaceController {
         task("Applying selected changes", () -> applyNow(selected,changes,countryConfirmed));
     }
     private void applyNow(List<Integer> subs, Map<ConfigKey,RawValue> draft, boolean country) throws Exception {
-        if (draft.isEmpty() || subs.isEmpty()) throw new IllegalArgumentException("No selected changes or subscriptions");
+        Map<Integer,Map<ConfigKey,RawValue>> plans = new LinkedHashMap<>();
+        for (int sub : subs) plans.put(sub,draft);
+        applyPlansNow(plans,null,country);
+    }
+    public void applyPerSim(Map<Integer,Map<ConfigKey,RawValue>> plans, Map<Integer,String> reviewedIdentities, boolean country) {
+        Map<Integer,Map<ConfigKey,RawValue>> captured = new LinkedHashMap<>();
+        plans.forEach((sub,values) -> captured.put(sub,Map.copyOf(values)));
+        Map<Integer,String> identities = Map.copyOf(reviewedIdentities);
+        task("Applying reviewed per-SIM changes", () -> applyPlansNow(captured,identities,country));
+    }
+    private void applyPlansNow(Map<Integer,Map<ConfigKey,RawValue>> plans, Map<Integer,String> reviewedIdentities, boolean country) throws Exception {
+        if (plans.isEmpty() || plans.values().stream().anyMatch(Map::isEmpty)) throw new IllegalArgumentException("No selected changes or subscriptions");
         Operation op = operation(); ArrayList<String> batch = new ArrayList<>();
+        if (reviewedIdentities != null) {
+            // 确认窗口捕获的真实身份不能在后台任务开始时被最新快照悄悄替换。
+            op.device.expected.clear(); op.device.expected.putAll(reviewedIdentities);
+        }
+        List<Integer> subs = List.copyOf(plans.keySet());
         for (int index = 0; index < subs.size(); index++) {
-            int sub = subs.get(index);
+            int sub = subs.get(index); Map<ConfigKey,RawValue> changes = plans.get(sub);
             try {
-                // 真正没有原始订阅值时，缺少可验证的unset恢复路径，不开始写入。
-                for (ConfigKey key : draft.keySet()) if (draft.get(key).kind() == RawValue.Kind.UNSET && key.scope != ConfigKey.Scope.DEVICE) throw new IllegalStateException("Selective unset restoration unavailable");
-                for (ConfigKey key : draft.keySet()) if (key.scope == ConfigKey.Scope.SUBSCRIPTION && op.device.readRaw(sub,key).kind() == RawValue.Kind.UNSET) throw new IllegalStateException("Raw subscription original unset; verified restoration unavailable");
-                var req = request(op,sub,draft,country); var state = op.engine.apply(req);
-                record(req.sim(),draft,state.name()); batch.add("SIM " + (index + 1) + ": " + state.name());
-            } catch (Exception e) {
+                for (ConfigKey key : changes.keySet()) if (changes.get(key).kind() == RawValue.Kind.UNSET && key.scope != ConfigKey.Scope.DEVICE) throw new IllegalStateException("Selective unset restoration unavailable");
+                for (ConfigKey key : changes.keySet()) if (key.scope == ConfigKey.Scope.SUBSCRIPTION && op.device.readRaw(sub,key).kind() == RawValue.Kind.UNSET) throw new IllegalStateException("Raw subscription original unset; verified restoration unavailable");
+                var req = request(op,sub,changes,country); var state = op.engine.apply(req);
+                record(req.sim(),changes,state.name()); batch.add("SIM " + (index + 1) + ": " + state.name());
+            } catch (Exception error) {
                 batch.add("SIM " + (index + 1) + ": failed or unknown; originals retained");
                 for (int remaining = index + 1; remaining < subs.size(); remaining++) batch.add("SIM " + (remaining + 1) + ": not executed");
-                results = List.copyOf(batch); throw e;
+                results = List.copyOf(batch); throw error;
             }
         }
         results = List.copyOf(batch); refreshNow();
+    }
+    public Map<ConfigKey,RawValue> profileOriginals(int subscription, RadioDisplayProfiles.Name profile) throws Exception {
+        RecoveryJournal.Entry entry = backup(subscription);
+        if (entry == null) throw new IllegalStateException("Saved original profile values unavailable");
+        return RadioDisplayProfiles.savedOriginals(profile,entry.originals());
     }
     public void restore(int sub, Set<ConfigKey> fields) {
         task("Restoring selected originals", () -> {

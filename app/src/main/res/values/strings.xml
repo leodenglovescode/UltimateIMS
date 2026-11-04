@@ -241,4 +241,11 @@
     <string name="live_read_unavailable">Status unavailable. Tap Refresh.</string>
     <string name="sim_access">SIM access</string>
     <string name="access_blocked">Blocked</string>
+    <string name="radio_display_section">5G display</string>
+    <string name="profile_5g_plus">5G+ / 5GA display profile</string>
+    <string name="profile_china_bars">Mainland-style 5G bars</string>
+    <string name="profile_5g_plus_help">Uses the NR-advanced display mapping and a 20 MHz threshold. The actual icon depends on carrier, bands and Android. This does not enable new modem capability or prove 5G-A, VoNR or faster data. Off restores saved original values; unsaved changes are cancelled. Review changes to apply.</string>
+    <string name="profile_china_bars_help">Ultimate IMS profile: SS-RSRP thresholds −110, −100, −90 and −80 dBm. Uses NR signal for NSA bars. This changes displayed bars, not measured signal or speed, and is not a universal mainland carrier standard. Off restores saved original values; unsaved changes are cancelled. Other metrics remain editable in Configure.</string>
+    <string name="key_nr_signal_metrics">5G signal measurements</string>
+    <string name="key_nr_nsa_lte_signal">Use LTE bars on 5G NSA</string>
 </resources>

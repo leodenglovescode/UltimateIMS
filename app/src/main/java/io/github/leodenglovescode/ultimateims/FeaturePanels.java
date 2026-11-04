@@ -28,6 +28,8 @@ final class FeaturePanels {
     private int sub;
     private final Map<ConfigKey,RawValue> draft = new EnumMap<>(ConfigKey.class);
     private final Map<ConfigKey,RawValue> portalDraft = new EnumMap<>(ConfigKey.class);
+    private final Map<RadioDisplayProfiles.Name,Map<ConfigKey,RawValue>> profileDraftBaselines = new EnumMap<>(RadioDisplayProfiles.Name.class);
+    private final Set<RadioDisplayProfiles.Name> profileRestores = EnumSet.noneOf(RadioDisplayProfiles.Name.class);
     private int draftSub = -1;
     private String draftIccid;
     private String restoredIdentity;
@@ -40,10 +42,17 @@ final class FeaturePanels {
         Bundle saved = new Bundle(); saved.putString("search",searchQuery); saved.putBoolean("allSims",allSims); saved.putBundle("draft",pack(draft)); saved.putBundle("portalDraft",pack(portalDraft)); saved.putInt("draftSub",draftSub); saved.putString("export",exportText);
         String digest = restoredIdentity;
         if (digest == null && draftIccid != null) try { digest = workspace.identityDigest(draftIccid); } catch (Exception e) { digest = "unverified"; }
+        Bundle profiles = new Bundle(); profileDraftBaselines.forEach((name,values) -> profiles.putBundle(name.name(),pack(values)));
+        saved.putBundle("profileBaselines",profiles);
+        saved.putStringArrayList("profileRestores",new ArrayList<>(profileRestores.stream().map(Enum::name).collect(java.util.stream.Collectors.toList())));
         saved.putString("identity",digest == null ? "unverified" : digest); return saved;
     }
     void restoreState(Bundle saved) {
-        if (saved == null) return; searchQuery = saved.getString("search",""); allSims = saved.getBoolean("allSims"); unpack(saved.getBundle("draft"),draft); unpack(saved.getBundle("portalDraft"),portalDraft); draftSub = saved.getInt("draftSub",-1); restoredIdentity = saved.getString("identity","unverified"); exportText = saved.getString("export"); if (draft.isEmpty()) restoredIdentity = null;
+        if (saved == null) return;
+        Bundle profiles = saved.getBundle("profileBaselines");
+        if (profiles != null) for (String name : profiles.keySet()) { Map<ConfigKey,RawValue> values = new EnumMap<>(ConfigKey.class); unpack(profiles.getBundle(name),values); profileDraftBaselines.put(RadioDisplayProfiles.Name.valueOf(name),values); }
+        for (String name : saved.getStringArrayList("profileRestores") == null ? List.<String>of() : saved.getStringArrayList("profileRestores")) profileRestores.add(RadioDisplayProfiles.Name.valueOf(name));
+        searchQuery = saved.getString("search",""); allSims = saved.getBoolean("allSims"); unpack(saved.getBundle("draft"),draft); unpack(saved.getBundle("portalDraft"),portalDraft); draftSub = saved.getInt("draftSub",-1); restoredIdentity = saved.getString("identity","unverified"); exportText = saved.getString("export"); if (draft.isEmpty()) restoredIdentity = null;
     }
     private Bundle pack(Map<ConfigKey,RawValue> values) {
         Bundle packed = new Bundle(); for (var item : values.entrySet()) { Bundle value = new Bundle(); value.putString("kind",item.getValue().kind().name()); value.putString("value",item.getValue().payload()); packed.putBundle(item.getKey().name(),value); } return packed;
@@ -82,6 +91,8 @@ final class FeaturePanels {
         case CROSS_SIM -> R.string.key_cross_sim;
         case UT -> R.string.key_ut;
         case NR_AVAILABILITY -> R.string.key_nr_availability;
+        case NR_SIGNAL_METRICS -> R.string.key_nr_signal_metrics;
+        case NR_NSA_LTE_SIGNAL -> R.string.key_nr_nsa_lte_signal;
         case NR_RSRP -> R.string.key_nr_rsrp;
         case NR_RSRQ -> R.string.key_nr_rsrq;
         case NR_SINR -> R.string.key_nr_sinr;
@@ -131,7 +142,7 @@ final class FeaturePanels {
         section(R.string.draft_section);
         button(R.string.presets, () -> {
             String[] names = {str(R.string.preset_recommended),str(R.string.preset_china_5g),str(R.string.preset_china_lte),str(R.string.preset_calling_available)};
-            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.presets).setItems(names,(d,n) -> { bindDraftIdentity(); draft.clear(); draft.putAll(Presets.build(Presets.Name.values()[n],Build.VERSION.SDK_INT)); redraw.run(); }).show();
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.presets).setItems(names,(d,n) -> { bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(Presets.build(Presets.Name.values()[n],Build.VERSION.SDK_INT)); redraw.run(); }).show();
         }, !workspace.busy());
         body = panelRoot;
         TextInputEditText search = new TextInputEditText(activity); search.setSingleLine(true); search.setTag("config_search"); search.setText(searchQuery);
@@ -163,16 +174,28 @@ final class FeaturePanels {
             }
             if (restoredIdentity != null) bindDraftIdentity();
             List<Integer> targets = allSims ? workspace.sims().stream().map(s -> s.getInt("sub")).collect(java.util.stream.Collectors.toList()) : List.of(sub);
+            Map<Integer,Map<ConfigKey,RawValue>> plans = new LinkedHashMap<>();
+            Map<Integer,String> identities = new LinkedHashMap<>();
             StringBuilder review = new StringBuilder(activity.getString(R.string.apply_confirm,draft.size(),targets.size()));
-            for (var change : draft.entrySet()) review.append("\n\n").append(label(change.getKey())).append("\n").append(value(workspace.currentValue(sub,change.getKey()))).append(" → ").append(value(change.getValue()));
+            for (int target : targets) {
+                Bundle targetSim = workspace.selected(target);
+                if (targetSim == null) throw new SecurityException("Verified SIM identity unavailable");
+                String iccid = targetSim.getString("iccid"); draftDigest(iccid); identities.put(target,iccid);
+                Map<ConfigKey,RawValue> changes = new EnumMap<>(ConfigKey.class); changes.putAll(draft);
+                // 关闭预设时逐卡读取各自原值，不把 SIM1 的原值复制到其他 SIM。
+                for (RadioDisplayProfiles.Name profile : profileRestores) changes.putAll(savedProfileOriginals(target,profile));
+                plans.put(target,Map.copyOf(changes));
+                review.append("\n\n").append(activity.getString(R.string.sim,targetSim.getInt("slot")+1,targetSim.getString("carrier"),str(targetSim.getBoolean("embedded") ? R.string.esim : R.string.physical)));
+                for (var change : changes.entrySet()) review.append("\n").append(label(change.getKey())).append(": ").append(value(workspace.currentValue(target,change.getKey()))).append(" → ").append(value(change.getValue()));
+            }
             confirm(review.toString(), () -> {
-                if (draft.containsKey(ConfigKey.SIM_COUNTRY)) confirm(str(R.string.country_confirm), () -> workspace.apply(targets, draft,true));
-                else workspace.apply(targets,draft,false);
+                if (draft.containsKey(ConfigKey.SIM_COUNTRY)) confirm(str(R.string.country_confirm), () -> workspace.applyPerSim(plans,identities,true));
+                else workspace.applyPerSim(plans,identities,false);
             });
         }, writable() && !draft.isEmpty());
         if (!workspace.backend.ready()) text(str(R.string.backend_needed));
         if (restoredIdentity != null || (!draft.isEmpty() && draftSub != sub)) button(R.string.review_draft,() -> confirm(str(R.string.draft_review_confirm), () -> { bindDraftIdentity(); redraw.run(); }),writable() && sub >= 0);
-        if (!draft.isEmpty()) button(R.string.clear_draft, () -> { draft.clear(); draftIccid = null; redraw.run(); }, !workspace.busy());
+        if (!draft.isEmpty()) button(R.string.clear_draft, () -> { draft.clear(); clearProfileDrafts(); draftIccid = null; redraw.run(); }, !workspace.busy());
     }
     private boolean radioKey(ConfigKey key) { return EnumSet.of(ConfigKey.VOLTE,ConfigKey.VOWIFI,ConfigKey.VONR,ConfigKey.VT,ConfigKey.CROSS_SIM,ConfigKey.UT,ConfigKey.LTE,ConfigKey.NR_AVAILABILITY).contains(key); }
     void radio() {
@@ -195,9 +218,12 @@ final class FeaturePanels {
             if (key == ConfigKey.NR_AVAILABILITY) { nrSwitch(1,R.string.nr_nsa_toggle); nrSwitch(2,R.string.nr_sa_toggle); }
             else toggleRow(body,key);
         }
+        section(R.string.radio_display_section);
+        profileRow(RadioDisplayProfiles.Name.NR_ADVANCED,R.string.profile_5g_plus,R.string.profile_5g_plus_help);
+        profileRow(RadioDisplayProfiles.Name.MAINLAND_BARS,R.string.profile_china_bars,R.string.profile_china_bars_help);
         if (!draft.isEmpty()) draftActions();
     }
-    private void saveToggle(ConfigKey key, RawValue target) {
+    private void ensureDraftIdentity() {
         if (!draft.isEmpty() && draftSub != sub) throw new SecurityException("Review the draft for this SIM before editing");
         if (DraftBinding.requiresRestoredIdentity(!draft.isEmpty(),restoredIdentity)) {
             Bundle selected = workspace.selected(sub);
@@ -207,9 +233,55 @@ final class FeaturePanels {
         if (liveSim == null) throw new SecurityException("Verified SIM identity unavailable");
         if (liveSim.containsKey("identityError")) throw new IllegalStateException(liveSim.getString("identityError"));
         draftDigest(liveSim.getString("iccid"));
-        key.validate(target,Build.VERSION.SDK_INT); bindDraftIdentity();
-        if (target.equals(workspace.currentValue(sub,key))) draft.remove(key); else draft.put(key,target);
+    }
+    private void saveToggle(ConfigKey key, RawValue target) { saveChanges(Map.of(key,target)); }
+    private void saveChanges(Map<ConfigKey,RawValue> changes) {
+        ensureDraftIdentity();
+        // 整个复合草稿先验证，再一次性修改；不得在第二项失败时留下一半预设。
+        changes.forEach((key,target) -> key.validate(target,Build.VERSION.SDK_INT));
+        bindDraftIdentity();
+        profileRestores.removeIf(profile -> changes.keySet().stream().anyMatch(RadioDisplayProfiles.target(profile)::containsKey));
+        changes.forEach((key,target) -> { if (target.equals(workspace.currentValue(sub,key))) draft.remove(key); else draft.put(key,target); });
         redraw.run();
+    }
+    private void clearProfileDrafts() { profileDraftBaselines.clear(); profileRestores.clear(); }
+    private Map<ConfigKey,RawValue> profileValues(RadioDisplayProfiles.Name profile, boolean pending) {
+        Map<ConfigKey,RawValue> values = new EnumMap<>(ConfigKey.class);
+        for (ConfigKey key : RadioDisplayProfiles.target(profile).keySet()) values.put(key,pending ? draft.getOrDefault(key,workspace.currentValue(sub,key)) : workspace.currentValue(sub,key));
+        return values;
+    }
+    private Map<ConfigKey,RawValue> savedProfileOriginals(int subscription, RadioDisplayProfiles.Name profile) {
+        try { return workspace.profileOriginals(subscription,profile); }
+        catch (Exception error) { throw new IllegalStateException(ActionFailure.describe(error)); }
+    }
+    private void toggleProfile(RadioDisplayProfiles.Name profile, boolean enabled) throws Exception {
+        ensureDraftIdentity();
+        if (enabled) {
+            Map<ConfigKey,RawValue> previous = RadioDisplayProfiles.overlayBeforeEnable(profile,draft);
+            saveChanges(RadioDisplayProfiles.target(profile));
+            profileDraftBaselines.putIfAbsent(profile,previous); profileRestores.remove(profile);
+        } else if (RadioDisplayProfiles.state(profile,profileValues(profile,false)) != RadioDisplayProfiles.State.ON) {
+            Map<ConfigKey,RawValue> previous = profileDraftBaselines.getOrDefault(profile,Map.of());
+            Map<ConfigKey,RawValue> next = RadioDisplayProfiles.cancelStaged(profile,draft,previous);
+            draft.clear(); draft.putAll(next); profileDraftBaselines.remove(profile); profileRestores.remove(profile);
+            bindDraftIdentity(); redraw.run();
+        } else {
+            Map<ConfigKey,RawValue> original = savedProfileOriginals(sub,profile);
+            saveChanges(original); profileRestores.add(profile); profileDraftBaselines.remove(profile);
+        }
+    }
+    private void profileRow(RadioDisplayProfiles.Name profile, int title, int help) {
+        var current = RadioDisplayProfiles.state(profile,profileValues(profile,false));
+        var shown = RadioDisplayProfiles.state(profile,profileValues(profile,true));
+        String name = str(title) + (RadioDisplayProfiles.target(profile).keySet().stream().anyMatch(draft::containsKey) ? " •" : "");
+        if (current == RadioDisplayProfiles.State.UNKNOWN) name += " · " + str(R.string.unknown);
+        var toggle = MaterialUi.switchRow(body,name,shown == RadioDisplayProfiles.State.ON,writable() && current != RadioDisplayProfiles.State.UNKNOWN,enabled -> safe(() -> {
+            try { toggleProfile(profile,enabled); } catch (RuntimeException error) { throw error; } catch (Exception error) { throw new IllegalStateException(ActionFailure.describe(error)); }
+        }));
+        toggle.setStateDescription(current == RadioDisplayProfiles.State.UNKNOWN ? str(R.string.unknown) : str(shown == RadioDisplayProfiles.State.ON ? R.string.true_value : R.string.false_value));
+        toggle.setTooltipText(str(help));
+        toggle.setOnLongClickListener(view -> { new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(title).setMessage(help).setPositiveButton(R.string.confirm,null).show(); return true; });
+        MaterialUi.divider(body);
     }
     private void toggleRow(LinearLayout parent, ConfigKey key) {
         RawValue current = workspace.currentValue(sub,key), shown = draft.getOrDefault(key,current);
@@ -234,7 +306,7 @@ final class FeaturePanels {
             case VOLTE, VONR, VT, CROSS_SIM, UT -> 0;
             case VOWIFI, WIFI_ONLY, WFC_MODE, WFC_ROAMING_MODE, WFC_ROAMING, EDITABLE_WFC, EDITABLE_WFC_ROAMING -> 1;
             case ADVANCED_CALLING_USER, WFC_USER, WFC_USER_MODE, WFC_USER_ROAMING_MODE, WFC_USER_ROAMING, VT_USER, CROSS_SIM_USER, VONR_USER -> 2;
-            case NR_AVAILABILITY, NR_RSRP, NR_RSRQ, NR_SINR -> 3;
+            case NR_AVAILABILITY, NR_RSRP, NR_RSRQ, NR_SINR, NR_SIGNAL_METRICS, NR_NSA_LTE_SIGNAL -> 3;
             case NR_ICON, NR_ADVANCED_BANDWIDTH, LTE_PLUS_BANDWIDTH, LTE, HIDE_LTE_PLUS, SHOW_4G, SHOW_4G_LTE, EDITABLE_LTE, HIDE_LTE_SETTING -> 4;
             default -> 5;
         };
@@ -367,7 +439,7 @@ final class FeaturePanels {
             String[] rows = new String[history.length()];
             for (int i=0;i<rows.length;i++) rows[i] = new java.util.Date(history.getJSONObject(i).getLong("time")) + " · " + history.getJSONObject(i).getString("state");
             new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.history).setItems(rows,(d,n) -> safe(() -> {
-                try { bindDraftIdentity(); draft.clear(); draft.putAll(workspace.historyDraft(n)); activity.openImsPage(); }
+                try { bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(workspace.historyDraft(n)); activity.openImsPage(); }
                 catch (Exception e) { throw new IllegalStateException(e); }
             })).show();
         } catch (Exception e) { throw new IllegalStateException(e); }
@@ -480,7 +552,7 @@ final class FeaturePanels {
                     JSONObject document = new JSONObject(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)); if (document.getInt("schema") != 1) throw new IllegalArgumentException("Unsupported schema");
                     Map<ConfigKey,RawValue> parsed = new EnumMap<>(ConfigKey.class); JSONObject values = document.getJSONObject("draft");
                     for (var names = values.keys(); names.hasNext();) { String name = names.next(); ConfigKey key = ConfigKey.valueOf(name); if (key.scope == ConfigKey.Scope.DEVICE) throw new IllegalArgumentException("SIM draft scope required"); JSONObject value = values.getJSONObject(name); RawValue raw = new RawValue(RawValue.Kind.valueOf(value.getString("kind")),value.getString("value")); key.validate(raw,Build.VERSION.SDK_INT); parsed.put(key,raw); }
-                    activity.runOnUiThread(() -> { bindDraftIdentity(); draft.clear(); draft.putAll(parsed); redraw.run(); });
+                    activity.runOnUiThread(() -> { bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(parsed); redraw.run(); });
                 }
                 localLog = "Local document operation completed";
             } catch (Exception e) { localLog = "Local document operation failed: " + e.getClass().getSimpleName(); }

@@ -6,6 +6,7 @@ import java.util.concurrent.ExecutionException;
 /** 只展示本项目固定的拒绝原因，任意框架消息与私密值不进入 UI 或日志。 */
 public final class ActionFailure {
     private static final Set<String> REASONS = Set.of(
+        "Saved original profile values unavailable", "Saved carrier originals already use this profile",
         "Automatic reapply paused; SIM identity unavailable", "Subscription inactive or unreadable", "Automatic reapply paused; recovery required", "Recovery required before new operation",
         "Original value unavailable", "No verifiable original backup available", "Write verification failed", "Final verification failed",
         "Identity key missing; preserve recovery backups", "Framework has no verified raw-unset subscription restoration on this build",

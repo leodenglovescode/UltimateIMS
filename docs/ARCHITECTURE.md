@@ -66,3 +66,9 @@ readSimIdentity 是固定窄接口：先核对调用 UID 和 32 字节会话密�
 ## 0.5.5-dev 完整记录读源与统一验证
 
 特权身份读源从 modem serial 改为 ISub.getActiveSubscriptionInfo 返回的完整 ICCID。保留认证回调及读范围、活动列表、记录 subId 对应关系和重复读取校验。不能用短 modem 数字前缀生成持久身份。中央 VerifiedSimIdentity 同时服务于 AndroidKeyStore IdentityStore、主机 SimIdentity、原值恢复目标和写入前身份比较。既有十进制 ICCID 的 HMAC 输入字节不变，已有原值文件不迁移、不删除。
+
+## 0.6.0-dev 显示预设与逐卡计划
+
+RadioDisplayProfiles 仅定义两组明确字段、实时匹配、已存原值子集和未提交草稿撤销。NR_NSA_LTE_SIGNAL 与 NR_SIGNAL_METRICS 使用固定 AOSP 白名单键，原 journal 继续按键名保存，旧备份不改名。
+
+确认页面为每卡构建不可变字段计划与当时的已验证 SIM 身份；applyPerSim 后台任务使用该身份进行核验，不能以任务开始时的新快照悄悄替换。失败保留每卡已执行/失败/未执行状态及原值日志。所有开关仍走既有有限协议，没有任意框架调用或 shell 执行器。

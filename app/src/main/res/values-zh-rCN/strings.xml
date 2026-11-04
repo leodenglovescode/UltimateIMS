@@ -241,4 +241,11 @@
     <string name="live_read_unavailable">状态暂不可用，请刷新。</string>
     <string name="sim_access">SIM 访问</string>
     <string name="access_blocked">受限</string>
+    <string name="radio_display_section">5G 显示</string>
+    <string name="profile_5g_plus">5G+ / 5GA 显示预设</string>
+    <string name="profile_china_bars">大陆风格 5G 信号格</string>
+    <string name="profile_5g_plus_help">使用 NR Advanced 显示映射和 20 MHz 门槛，实际图标仍取决于运营商、频段和系统。不会增加基带能力，也不能证明 5G-A、VoNR 或网速提升。关闭时恢复已保存原值；尚未应用的修改则取消。请审阅后应用。</string>
+    <string name="profile_china_bars_help">Ultimate IMS 预设：SS-RSRP 门槛为 −110、−100、−90、−80 dBm，NSA 信号格使用 NR 强度。仅改变信号格显示，不改变真实信号或网速，也不是所有大陆运营商的统一标准。关闭时恢复已保存原值；尚未应用的修改则取消。其他测量指标仍可在配置页编辑。</string>
+    <string name="key_nr_signal_metrics">5G 信号测量指标</string>
+    <string name="key_nr_nsa_lte_signal">5G NSA 使用 LTE 信号格</string>
 </resources>

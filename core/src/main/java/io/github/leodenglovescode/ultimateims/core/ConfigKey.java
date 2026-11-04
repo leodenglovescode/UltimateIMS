@@ -13,6 +13,8 @@ public enum ConfigKey {
     CROSS_SIM("carrier_cross_sim_ims_available_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     UT("carrier_supports_ss_over_ut_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     NR_AVAILABILITY("carrier_nr_availabilities_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_SIGNAL_METRICS("parameters_use_for_5g_nr_signal_bar_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    NR_NSA_LTE_SIGNAL("signal_strength_nr_nsa_use_lte_as_primary_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     NR_RSRP("5g_nr_ssrsrp_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
     NR_RSRQ("5g_nr_ssrsrq_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
     NR_SINR("5g_nr_sssinr_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
@@ -58,6 +60,7 @@ public enum ConfigKey {
         if (this == WFC_MODE || this == WFC_ROAMING_MODE) range(value, 0, 2);
         if (this == WFC_USER_MODE || this == WFC_USER_ROAMING_MODE) range(value, -1, 2);
         else if (scope == Scope.SUBSCRIPTION) range(value, -1, 1);
+        if (this == NR_SIGNAL_METRICS) range(value, 0, 7);
         if (this == NR_ADVANCED_BANDWIDTH || this == LTE_PLUS_BANDWIDTH) range(value, 0, 1_000_000);
         if (this == NR_AVAILABILITY) {
             java.util.Set<String> entries = new java.util.HashSet<>();
