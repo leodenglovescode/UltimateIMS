@@ -179,12 +179,12 @@ public final class PlatformOperations {
                 try { putRaw(value, read(sub, key)); } catch (Exception e) { putRaw(value, RawValue.unknown()); }
                 item.putBundle(key.name(), value);
             }
-            try {
-                for (String reason : List.of("USER", "POWER", "CARRIER")) {
+            for (String reason : List.of("USER", "POWER", "CARRIER")) {
+                try {
                     int code = PlatformMethods.intField("android.telephony.TelephonyManager", "ALLOWED_NETWORK_TYPES_REASON_" + reason);
                     item.putLong("mask_" + reason, phone.getAllowedNetworkTypesForReason(code));
-                }
-            } catch (Exception e) { /* 缺失掩码保持未知，已读取掩码仍保留。 */ }
+                } catch (Exception e) { /* 各策略独立读取；一项不可读不阻止其他策略，也不把缺失值视为零。 */ }
+            }
             try { item.putInt("dataRat", phone.getDataNetworkType()); item.putInt("voiceRat", phone.getVoiceNetworkType()); item.putInt("callState", phone.getCallState()); } catch (Exception e) { /* 未知。 */ }
             try {
                 ServiceState state = (ServiceState) PlatformMethods.invoke(phone,"getServiceState",ServiceState.class,new Class<?>[]{int.class}, PlatformMethods.intField("android.telephony.TelephonyManager","INCLUDE_LOCATION_DATA_NONE"));

@@ -3,6 +3,7 @@ package io.github.leodenglovescode.ultimateims.backend;
 import android.content.ComponentName;
 import android.os.*;
 import java.security.MessageDigest;
+import io.github.leodenglovescode.ultimateims.core.DelegationMethods;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -11,6 +12,7 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
     private int appUid = -1;
     private byte[] secret;
     private IBrokerChannel broker;
+    private DelegationMethods delegation;
     private volatile IInstrumentationSession instrumentation;
     private final CountDownLatch prepared = new CountDownLatch(1);
     private volatile boolean closed;
@@ -32,8 +34,11 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
             stage = "broker-initialization";
             broker.initialize(secret);
             stage = "delegation-preflight";
+            // 在任何设备写入前验证启动、读取、释放三个接口，兼容固件的实际签名。
             Object am = PlatformMethods.activityManager();
-            List<?> occupied = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
+            delegation = new DelegationMethods(am);
+            android.util.Log.i("UltimateIMS", delegation.uidScopedStop() ? "Permission release signature: UID scoped" : "Permission release signature: legacy");
+            List<?> occupied = delegation.permissions();
             if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied by another client");
             stage = "instrumentation-connection";
             Class<?> uiType = Class.forName("android.app.IUiAutomationConnection");
@@ -69,7 +74,6 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
         authenticate(token);
         if (operation < Protocol.SNAPSHOT || operation > Protocol.APN_RESTORE || args == null) throw new IllegalArgumentException("Invalid operation");
         boolean delegated = false;
-        Object am = null;
         long identity = Binder.clearCallingIdentity();
         try {
             if (!prepared.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Broker readiness timeout; recovery required");
@@ -79,19 +83,18 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
                 instrumentation = null;
                 return result;
             }
-            am = PlatformMethods.activityManager();
-            List<?> occupied = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
+            List<?> occupied = delegation.permissions();
             if (occupied == null || !occupied.isEmpty()) throw new SecurityException("Shell permission delegation is occupied");
-            PlatformMethods.invoke(am, "startDelegateShellPermissionIdentity", void.class, new Class<?>[]{int.class, String[].class}, appUid, Protocol.PERMISSIONS);
+            delegation.start(appUid, Protocol.PERMISSIONS);
             delegated = true;
-            List<?> granted = (List<?>) PlatformMethods.invoke(am, "getDelegatedShellPermissions", List.class, new Class<?>[]{});
+            List<?> granted = delegation.permissions();
             if (granted == null || !granted.containsAll(Arrays.asList(Protocol.PERMISSIONS))) throw new SecurityException("Permission delegation was not established");
             return broker.execute(token, operation, args);
         } catch (Exception e) {
             Bundle failure = new Bundle(); failure.putBoolean("ok", false); failure.putString("error", PlatformMethods.failure(e)); return failure;
         } finally {
-            try { if (delegated && am != null) {
-                try { PlatformMethods.invoke(am, "stopDelegateShellPermissionIdentity", void.class, new Class<?>[]{}); }
+            try { if (delegated) {
+                try { delegation.stop(appUid); }
                 catch (Exception e) { closed = true; android.util.Log.e("UltimateIMS", "Permission delegation release failed; backend closed"); throw new IllegalStateException("Permission release failed; operation result uncertain"); }
             }
             } finally { Binder.restoreCallingIdentity(identity); }
