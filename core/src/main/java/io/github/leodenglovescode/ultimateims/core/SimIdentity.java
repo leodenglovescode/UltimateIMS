@@ -13,12 +13,12 @@ public record SimIdentity(String digest) {
         if (!digest.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Invalid SIM identity");
     }
     public static SimIdentity verifiedIccid(String iccid, byte[] installationKey) {
-        if (iccid == null || !iccid.matches("[0-9]{18,22}[Ff]?")) throw new IllegalArgumentException("SIM identity unavailable");
+        if (!VerifiedSimIdentity.valid(iccid)) throw new IllegalArgumentException("SIM identity unavailable");
         if (installationKey.length < 32) throw new IllegalArgumentException("Identity key too short");
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(installationKey.clone(), "HmacSHA256"));
-            byte[] bytes = mac.doFinal(("UltimateIMS:SIM:v1:" + iccid.toUpperCase(java.util.Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
+            byte[] bytes = mac.doFinal(("UltimateIMS:SIM:v1:" + VerifiedSimIdentity.canonical(iccid)).getBytes(StandardCharsets.UTF_8));
             StringBuilder result = new StringBuilder();
             for (byte b : bytes) result.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
             return new SimIdentity(result.toString());

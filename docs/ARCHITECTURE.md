@@ -62,3 +62,7 @@ readSimIdentity 是固定窄接口：先核对调用 UID 和 32 字节会话密�
 声明的服务名/接口/方法和参数类型为固定常量，不接受任意命令、服务、方法名或外部归属包。shell 使用自己的 com.android.shell；root 不伪装包名。原 HMAC 与私有原值文件格式不改变，不删除或迁移备份。回调完成后关闭读范围；STOP/unbind 清除回调 token。
 
 此项在主机测试中验证，尚未在用户设备上验证新回调、权限或实际 ICCID 返回。
+
+## 0.5.5-dev 完整记录读源与统一验证
+
+特权身份读源从 modem serial 改为 ISub.getActiveSubscriptionInfo 返回的完整 ICCID。保留认证回调及读范围、活动列表、记录 subId 对应关系和重复读取校验。不能用短 modem 数字前缀生成持久身份。中央 VerifiedSimIdentity 同时服务于 AndroidKeyStore IdentityStore、主机 SimIdentity、原值恢复目标和写入前身份比较。既有十进制 ICCID 的 HMAC 输入字节不变，已有原值文件不迁移、不删除。

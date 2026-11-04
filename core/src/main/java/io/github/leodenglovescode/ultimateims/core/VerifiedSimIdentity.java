@@ -1,8 +1,19 @@
 package io.github.leodenglovescode.ultimateims.core;
 
-/** 两个实时框架读源可相互校验；均不可读或相互矛盾时拒绝，绝不使用 subId 代替 SIM 身份。 */
+import java.util.Locale;
+
+/** 接受框架完整 ICCID 的十进制旧格式与 10 字节十六进制格式；短截断值不能充当身份。 */
 public final class VerifiedSimIdentity {
-    private static boolean valid(String value) { return value != null && value.matches("[0-9]{18,22}[Ff]?"); }
+    public static boolean valid(String value) {
+        if (value == null) return false;
+        boolean format = value.matches("[0-9]{18,22}[Ff]?") || value.matches("[0-9A-Fa-f]{20}");
+        // 常见空卡/占位内容不能成为恢复目标。
+        return format && !value.matches("0+[Ff]*") && !value.matches("[Ff]+");
+    }
+    public static String canonical(String value) {
+        if (!valid(value)) throw new SecurityException("Verified SIM identity unavailable");
+        return value.toUpperCase(Locale.ROOT);
+    }
     public static String choose(String subscriptionIccid, String telephonyIccid) {
         boolean subscription = valid(subscriptionIccid), telephony = valid(telephonyIccid);
         if (subscription && telephony && !subscriptionIccid.equalsIgnoreCase(telephonyIccid)) throw new SecurityException("SIM identity changed or unavailable");

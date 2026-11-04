@@ -5,6 +5,7 @@ import android.security.keystore.*;
 import java.security.*;
 import javax.crypto.*;
 import io.github.leodenglovescode.ultimateims.core.SimIdentity;
+import io.github.leodenglovescode.ultimateims.core.VerifiedSimIdentity;
 
 /** 安装私有 HMAC 密钥不可导出；密钥丢失且备份存在时拒绝新建，避免伪绑定恢复。 */
 final class IdentityStore {
@@ -22,8 +23,8 @@ final class IdentityStore {
         }
     }
     synchronized SimIdentity sim(String iccid) throws Exception {
-        if (iccid == null || !iccid.matches("[0-9]{18,22}[Ff]?")) throw new SecurityException("Verified SIM identity unavailable");
-        return digest("UltimateIMS:SIM:v1:" + iccid.toUpperCase(java.util.Locale.ROOT));
+        // 旧格式仍是同一前缀和大写字符串，已保存的 HMAC/原值备份不重新命名。
+        return digest("UltimateIMS:SIM:v1:" + VerifiedSimIdentity.canonical(iccid));
     }
     synchronized SimIdentity device() throws Exception { return digest("UltimateIMS:DEVICE:v1"); }
     private SimIdentity digest(String text) throws Exception {

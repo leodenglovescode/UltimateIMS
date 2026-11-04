@@ -83,7 +83,7 @@ public final class PlatformOperations {
     }
     private void verifySim(int sub, String expected) throws Exception {
         String current = identity(sub);
-        if (expected == null || !expected.matches("[0-9]{18,22}[Ff]?") || !expected.equals(current)) throw new SecurityException("SIM identity changed or unavailable");
+        if (!VerifiedSimIdentity.canonical(expected).equals(VerifiedSimIdentity.canonical(current))) throw new SecurityException("SIM identity changed or unavailable");
     }
     private void requireConfirmedIdle(int sub, Bundle args) throws Exception {
         if (!args.getBoolean("confirmed")) throw new SecurityException("Explicit confirmation required");

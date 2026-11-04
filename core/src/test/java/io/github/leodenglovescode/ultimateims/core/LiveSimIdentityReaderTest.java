@@ -40,4 +40,12 @@ public class LiveSimIdentityReaderTest {
         Source source = new Source() { @Override public String serial(int sub) { serialCalls++; throw new SecurityException("Denied"); } };
         assertThrows(SecurityException.class,() -> LiveSimIdentityReader.read(source,42)); assertEquals(1,source.serialCalls);
     }
+    @Test public void repeatedFullHexSubscriptionRecordIsVerified() throws Exception {
+        Source source = new Source(); source.first = source.second = "898600A1234567890123";
+        assertEquals(source.first,LiveSimIdentityReader.read(source,42));
+    }
+    @Test public void replacementBetweenHexRecordReadsIsRejected() {
+        Source source = new Source(); source.first = "898600A1234567890123"; source.second = "898600B1234567890123";
+        assertThrows(SecurityException.class,() -> LiveSimIdentityReader.read(source,42));
+    }
 }
