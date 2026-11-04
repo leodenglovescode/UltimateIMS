@@ -7,5 +7,6 @@ interface IPrivilegedChannel {
     void initialize(int appUid, int mode, in byte[] secret, IBrokerChannel broker, IBinder clientLife) = 0;
     Bundle invoke(in byte[] secret, int operation, in Bundle arguments) = 1;
     void ready(in byte[] secret, IInstrumentationSession session) = 2;
+    String readSimIdentity(in byte[] secret, int subscription) = 3;
     void destroy() = 16777114;
 }

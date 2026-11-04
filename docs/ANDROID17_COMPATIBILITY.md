@@ -19,3 +19,9 @@
 | 用户/电源/运营商策略 | [TelephonyManager](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/telephony/java/android/telephony/TelephonyManager.java) 保留 getAllowedNetworkTypesForReason(int) | 改成三项独立读取，任何一项失败不遮蔽其他项；未知不写成零。Battery Saver 排除 NR 时只解释，不更改电源策略 |
 | 实际注册 | [ServiceState](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/telephony/java/android/telephony/ServiceState.java) 保留 getNrState() 与 PS NetworkRegistrationInfo；TelephonyManager 保留无位置 getServiceState(int) | 继续区分 NSA 辅载波、SA PS RAT 和显示覆盖，设备未测 |
 | 持久 VoLTE 订阅字段 | [ISub](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/telephony/java/com/android/internal/telephony/ISub.aidl) 保留原始属性读取与 void setSubscriptionProperty(int,String,String) | 与 CarrierConfig 重放独立；此表只核对接口，未验证 Android17 重启持久性或 provisioning 实际消费行为。原值/未知/恢复保护不变 |
+
+## 0.5.4-dev 身份路径更正
+
+新实现按官方 [IPhoneSubInfo](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/telephony/java/com/android/internal/telephony/IPhoneSubInfo.aidl) 的 getIccSerialNumberForSubscriber(int,String,String)，由用户选择的后端实际读取，经活动卡/重复标识检查后认证回传。未扩大为任意身份信息执行器，未更改系统权限或 AppOps。源码字节哈希在 privileged-identity-validation.json 中。
+
+自动重放遇到身份不可验证时暂停，并保留所有备份；SIM 访问受限原因在主页面按需打开。最终实际 ICCID/双卡/NR/写入/恢复结果仍由用户继续验收。

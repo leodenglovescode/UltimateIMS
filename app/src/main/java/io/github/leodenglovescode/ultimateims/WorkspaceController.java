@@ -220,6 +220,10 @@ public final class WorkspaceController {
     public RecoveryJournal.Entry backup(int sub) throws Exception { storage(); return journal.read(sub == -2 ? identities.device() : identities.sim(Objects.requireNonNull(selected(sub)).getString("iccid"))); }
     private void autoRestore() throws Exception {
         for (Bundle sim : sims()) {
+            if (sim.containsKey("identityError") || sim.getString("iccid") == null) {
+                setAutoRestore(false);
+                throw new IllegalStateException("Automatic reapply paused; SIM identity unavailable");
+            }
             var entry = backup(sim.getInt("sub"));
             if (entry != null && entry.requiresRecovery()) { setAutoRestore(false); throw new IllegalStateException("Automatic reapply paused; recovery required"); }
             if (entry != null && entry.state() == RecoveryJournal.State.VERIFIED) {

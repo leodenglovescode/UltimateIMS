@@ -188,6 +188,7 @@ final class FeaturePanels {
             var radio = RadioObservation.classify(observed.containsKey("psRegistered") ? observed.getBoolean("psRegistered") : null,observed.containsKey("psRat") ? observed.getInt("psRat") : null,observed.containsKey("nrConnected") ? observed.getBoolean("nrConnected") : null);
             String network = radio == RadioObservation.State.NR_SA ? "5G SA" : radio == RadioObservation.State.NR_NSA ? "5G NSA" : observed.containsKey("psRat") && observed.getInt("psRat") == 13 ? "LTE" : str(R.string.unknown);
             MaterialUi.add(body,MaterialUi.row(activity,str(R.string.network_status),network,null));
+            if (observed.containsKey("identityError")) MaterialUi.add(body,MaterialUi.row(activity,str(R.string.sim_access),str(R.string.access_blocked),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.sim_access).setMessage(observed.getString("identityError")).setPositiveButton(R.string.confirm,null).show()));
         }
         section(R.string.radio_controls);
         for (ConfigKey key : ConfigKey.values()) if (radioKey(key) && Build.VERSION.SDK_INT >= key.minApi) {
@@ -204,6 +205,7 @@ final class FeaturePanels {
         }
         Bundle liveSim = workspace.selected(sub);
         if (liveSim == null) throw new SecurityException("Verified SIM identity unavailable");
+        if (liveSim.containsKey("identityError")) throw new IllegalStateException(liveSim.getString("identityError"));
         draftDigest(liveSim.getString("iccid"));
         key.validate(target,Build.VERSION.SDK_INT); bindDraftIdentity();
         if (target.equals(workspace.currentValue(sub,key))) draft.remove(key); else draft.put(key,target);

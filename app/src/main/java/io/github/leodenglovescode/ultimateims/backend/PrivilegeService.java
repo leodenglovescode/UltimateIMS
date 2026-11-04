@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.os.*;
 import java.security.MessageDigest;
 import io.github.leodenglovescode.ultimateims.core.DelegationMethods;
+import io.github.leodenglovescode.ultimateims.core.IdentityReadScope;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -13,6 +14,8 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
     private byte[] secret;
     private IBrokerChannel broker;
     private DelegationMethods delegation;
+    private final IdentityReadScope identityScope = new IdentityReadScope();
+    private final Object identityReadLock = new Object();
     private volatile IInstrumentationSession instrumentation;
     private final CountDownLatch prepared = new CountDownLatch(1);
     private volatile boolean closed;
@@ -32,7 +35,7 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
             // 应用死亡时让正在执行的 finally 完成（特别是 IMS enable），随后退出。
             clientLife.linkToDeath(() -> { synchronized(PrivilegeService.this) { closed = true; System.exit(0); } },0);
             stage = "broker-initialization";
-            broker.initialize(secret);
+            broker.initialize(secret, this);
             stage = "delegation-preflight";
             // 在任何设备写入前验证启动、读取、释放三个接口，兼容固件的实际签名。
             Object am = PlatformMethods.activityManager();
@@ -71,6 +74,19 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
             android.util.Log.i("UltimateIMS", "Authenticated instrumentation and broker ready");
         } finally { Binder.restoreCallingIdentity(identity); }
     }
+    @Override public String readSimIdentity(byte[] token, int subscription) {
+        authenticate(token);
+        synchronized(identityReadLock) {
+            identityScope.require(subscription);
+            long identity = Binder.clearCallingIdentity();
+            try { return PrivilegedSimIdentityReader.read(subscription); }
+            catch (Exception error) {
+                String reason = io.github.leodenglovescode.ultimateims.core.ActionFailure.describe(error);
+                android.util.Log.w("UltimateIMS","Privileged SIM identity read: " + reason);
+                throw new IllegalStateException(reason);
+            } finally { Binder.restoreCallingIdentity(identity); }
+        }
+    }
     @Override public synchronized Bundle invoke(byte[] token, int operation, Bundle args) {
         authenticate(token);
         if (operation < Protocol.SNAPSHOT || operation > Protocol.APN_RESTORE || args == null) throw new IllegalArgumentException("Invalid operation");
@@ -90,7 +106,9 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
             delegated = true;
             List<?> granted = delegation.permissions(appUid);
             if (granted == null || !granted.containsAll(Arrays.asList(Protocol.PERMISSIONS))) throw new SecurityException("Permission delegation was not established");
-            return broker.execute(token, operation, args);
+            identityScope.begin(args.getInt("sub",-1), operation == Protocol.SNAPSHOT);
+            try { return broker.execute(token, operation, args); }
+            finally { identityScope.end(); }
         } catch (Exception e) {
             Bundle failure = new Bundle(); failure.putBoolean("ok", false); failure.putString("error", PlatformMethods.failure(e)); return failure;
         } finally {

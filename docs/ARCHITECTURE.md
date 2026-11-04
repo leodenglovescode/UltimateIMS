@@ -54,3 +54,11 @@ MainActivity 改为 AppCompatActivity；MaterialUi 统一 Material 3 控件、�
 ## 0.4.0-dev 页面与连接增量
 
 MaterialUi 的分组容器改为无卡片平面列表，ConfigurationToggle 集中管理布尔/0-1 用户偏好与 NSA/SA 数组语义。两条主要页面为 IMS 与无线、配置；后者同时持有显式后端操作。原恢复日志与第一方通信架构不变。BackendManager 的授权回调绑定 epoch，认证使用相同串行 RPC 和未知超时约束；一次性认证快照传给 WorkspaceController，消除重复启动读取。注册与可用性证据仍由真实框架观测提供，不从历史或开关推断。
+
+## 0.5.4-dev 特权身份读取
+
+readSimIdentity 是固定窄接口：先核对调用 UID 和 32 字节会话密钥，仅在 invoke 已通过认证与准备检查、broker.execute 正在执行期间开放。普通操作只允许当前 subId；SNAPSHOT 可枚举当前活动卡。所有情况均使用真实活动列表核验，读取前后检查活动状态，重复读取并比对 ICCID。不同读源矛盾、空值、非活动卡或换卡均拒绝。回调使用独立读锁，不能获取 invoke 持有的监视器，以免跨进程等待死锁。
+
+声明的服务名/接口/方法和参数类型为固定常量，不接受任意命令、服务、方法名或外部归属包。shell 使用自己的 com.android.shell；root 不伪装包名。原 HMAC 与私有原值文件格式不改变，不删除或迁移备份。回调完成后关闭读范围；STOP/unbind 清除回调 token。
+
+此项在主机测试中验证，尚未在用户设备上验证新回调、权限或实际 ICCID 返回。

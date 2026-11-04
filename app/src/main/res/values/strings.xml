@@ -239,4 +239,6 @@
     <string name="read_unavailable">Unavailable</string>
     <string name="read_ready">Updated</string>
     <string name="live_read_unavailable">Status unavailable. Tap Refresh.</string>
+    <string name="sim_access">SIM access</string>
+    <string name="access_blocked">Blocked</string>
 </resources>

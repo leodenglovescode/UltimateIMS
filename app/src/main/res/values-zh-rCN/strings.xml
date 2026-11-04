@@ -239,4 +239,6 @@
     <string name="read_unavailable">不可用</string>
     <string name="read_ready">已更新</string>
     <string name="live_read_unavailable">状态暂不可用，请刷新。</string>
+    <string name="sim_access">SIM 访问</string>
+    <string name="access_blocked">受限</string>
 </resources>

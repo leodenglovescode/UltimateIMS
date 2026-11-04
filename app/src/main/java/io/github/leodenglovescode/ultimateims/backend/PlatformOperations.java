@@ -13,7 +13,9 @@ import java.util.concurrent.*;
 /** 所有实际框架写入均在应用 UID 的隔离 broker 进程中，依靠短时明确委托。 */
 public final class PlatformOperations {
     private final Context context;
-    PlatformOperations(Context context) { this.context = context; }
+    interface IdentityReader { String read(int subscription) throws Exception; }
+    private final IdentityReader identityReader;
+    PlatformOperations(Context context, IdentityReader identityReader) { this.context = context; this.identityReader = identityReader; }
     public Bundle execute(int operation, Bundle args) {
         Bundle result = new Bundle();
         try {
@@ -74,20 +76,16 @@ public final class PlatformOperations {
         if (active != null) for (SubscriptionInfo info : active) if (info.getSubscriptionId() == sub) return info;
         throw new IllegalStateException("Subscription inactive or unreadable");
     }
-    // ICCID 仅用于安装私有 HMAC 和换卡校验，不显示、不记录、不导出。
-    @android.annotation.SuppressLint({"MissingPermission", "HardwareIds"})
-    private String identity(int sub) {
+    // 实际后端读取 ICCID；broker 不再把委托权限的应用读源当作另一种身份权限。
+    private String identity(int sub) throws Exception {
         SubscriptionInfo selected = sim(sub);
-        String serial = null;
-        try { serial = context.getSystemService(TelephonyManager.class).createForSubscriptionId(sub).getSimSerialNumber(); }
-        catch (Exception e) { readFailure("sim-serial",e); }
-        return VerifiedSimIdentity.choose(selected.getIccId(),serial);
+        return VerifiedSimIdentity.choose(selected.getIccId(),identityReader.read(sub));
     }
-    private void verifySim(int sub, String expected) {
+    private void verifySim(int sub, String expected) throws Exception {
         String current = identity(sub);
         if (expected == null || !expected.matches("[0-9]{18,22}[Ff]?") || !expected.equals(current)) throw new SecurityException("SIM identity changed or unavailable");
     }
-    private void requireConfirmedIdle(int sub, Bundle args) {
+    private void requireConfirmedIdle(int sub, Bundle args) throws Exception {
         if (!args.getBoolean("confirmed")) throw new SecurityException("Explicit confirmation required");
         verifySim(sub, args.getString("expectedIccid"));
         if (context.getSystemService(TelephonyManager.class).getCallState() != TelephonyManager.CALL_STATE_IDLE) throw new IllegalStateException("A call is active; operation refused");
@@ -181,7 +179,7 @@ public final class PlatformOperations {
         if (active != null) for (SubscriptionInfo info : active) {
             Bundle item = new Bundle(); int sub = info.getSubscriptionId();
             item.putInt("sub", sub); item.putInt("slot", info.getSimSlotIndex()); item.putString("carrier", info.getCarrierName().toString());
-            try { item.putString("iccid",identity(sub)); } catch (Exception e) { readFailure("sim-identity",e); } item.putBoolean("embedded", info.isEmbedded()); item.putBoolean("active", true);
+            try { item.putString("iccid",identity(sub)); } catch (Exception e) { item.putString("identityError",ActionFailure.describe(e)); readFailure("sim-identity",e); } item.putBoolean("embedded", info.isEmbedded()); item.putBoolean("active", true);
             item.putBoolean("defaultData", sub == SubscriptionManager.getDefaultDataSubscriptionId());
             TelephonyManager phone = context.getSystemService(TelephonyManager.class).createForSubscriptionId(sub);
             item.putString("country", phone.getSimCountryIso());
