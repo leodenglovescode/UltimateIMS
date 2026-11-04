@@ -20,6 +20,9 @@ public enum ConfigKey {
     NR_SINR("5g_nr_sssinr_thresholds_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
     NR_ICON("5g_icon_configuration_string", RawValue.Kind.STRING, 33, Scope.CARRIER),
     NR_ADVANCED_BANDWIDTH("nr_advanced_threshold_bandwidth_khz_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    NR_ADVANCED_BANDS("additional_nr_advanced_bands_int_array", RawValue.Kind.INTEGER_ARRAY, 33, Scope.CARRIER),
+    NR_ADVANCED_PCO("nr_advanced_capable_pco_id_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
+    NR_ADVANCED_INCLUDE_LTE("include_lte_for_nr_advanced_threshold_bandwidth_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     LTE_PLUS_BANDWIDTH("lte_plus_threshold_bandwidth_khz_int", RawValue.Kind.INTEGER, 33, Scope.CARRIER),
     LTE("lte_enabled_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
     HIDE_LTE_PLUS("hide_lte_plus_data_icon_bool", RawValue.Kind.BOOLEAN, 33, Scope.CARRIER),
@@ -62,6 +65,16 @@ public enum ConfigKey {
         else if (scope == Scope.SUBSCRIPTION) range(value, -1, 1);
         if (this == NR_SIGNAL_METRICS) range(value, 0, 7);
         if (this == NR_ADVANCED_BANDWIDTH || this == LTE_PLUS_BANDWIDTH) range(value, 0, 1_000_000);
+        if (this == NR_ADVANCED_PCO) range(value, 0, 65535);
+        if (this == NR_ADVANCED_BANDS && !value.payload().isEmpty()) {
+            java.util.Set<Integer> bands = new java.util.HashSet<>();
+            String[] parts = value.payload().split(",",-1);
+            if (parts.length > 64) throw new IllegalArgumentException("Too many NR display bands");
+            for (String part : parts) {
+                int band = Integer.parseInt(part);
+                if (band < 1 || band > 1024 || !bands.add(band)) throw new IllegalArgumentException("Invalid NR display band");
+            }
+        }
         if (this == NR_AVAILABILITY) {
             java.util.Set<String> entries = new java.util.HashSet<>();
             if (!value.payload().isEmpty()) for (String part : value.payload().split(",")) {

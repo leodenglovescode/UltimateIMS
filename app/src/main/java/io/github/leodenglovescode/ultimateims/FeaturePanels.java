@@ -97,6 +97,9 @@ final class FeaturePanels {
         case NR_RSRQ -> R.string.key_nr_rsrq;
         case NR_SINR -> R.string.key_nr_sinr;
         case NR_ICON -> R.string.key_nr_icon;
+        case NR_ADVANCED_BANDS -> R.string.key_nr_advanced_bands;
+        case NR_ADVANCED_PCO -> R.string.key_nr_advanced_pco;
+        case NR_ADVANCED_INCLUDE_LTE -> R.string.key_nr_advanced_include_lte;
         case NR_ADVANCED_BANDWIDTH -> R.string.key_nr_advanced_bandwidth;
         case LTE_PLUS_BANDWIDTH -> R.string.key_lte_plus_bandwidth;
         case LTE -> R.string.key_lte;
@@ -142,7 +145,13 @@ final class FeaturePanels {
         section(R.string.draft_section);
         button(R.string.presets, () -> {
             String[] names = {str(R.string.preset_recommended),str(R.string.preset_china_5g),str(R.string.preset_china_lte),str(R.string.preset_calling_available)};
-            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.presets).setItems(names,(d,n) -> { bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(Presets.build(Presets.Name.values()[n],Build.VERSION.SDK_INT)); redraw.run(); }).show();
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.presets).setItems(names,(d,n) -> safe(() -> {
+                ensureDraftIdentity();
+                Map<ConfigKey,RawValue> changes = new EnumMap<>(Presets.build(Presets.Name.values()[n],Build.VERSION.SDK_INT));
+                if (Presets.Name.values()[n] == Presets.Name.CHINA_5G) changes.putAll(RadioDisplayProfiles.target(RadioDisplayProfiles.Name.NR_ADVANCED,profileValues(RadioDisplayProfiles.Name.NR_ADVANCED,false)));
+                changes.forEach((key,value) -> key.validate(value,Build.VERSION.SDK_INT));
+                bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(changes); if (Presets.Name.values()[n] == Presets.Name.CHINA_5G) profileDraftBaselines.put(RadioDisplayProfiles.Name.NR_ADVANCED,Map.of()); redraw.run();
+            })).show();
         }, !workspace.busy());
         body = panelRoot;
         TextInputEditText search = new TextInputEditText(activity); search.setSingleLine(true); search.setTag("config_search"); search.setText(searchQuery);
@@ -184,6 +193,12 @@ final class FeaturePanels {
                 Map<ConfigKey,RawValue> changes = new EnumMap<>(ConfigKey.class); changes.putAll(draft);
                 // 关闭预设时逐卡读取各自原值，不把 SIM1 的原值复制到其他 SIM。
                 for (RadioDisplayProfiles.Name profile : profileRestores) changes.putAll(savedProfileOriginals(target,profile));
+                // 显式全卡操作也保留每张目标卡已有频段，避免复制所选卡的显示限制。
+                if (profileDraftBaselines.containsKey(RadioDisplayProfiles.Name.NR_ADVANCED) && !profileRestores.contains(RadioDisplayProfiles.Name.NR_ADVANCED) && changes.containsKey(ConfigKey.NR_ADVANCED_BANDS)) {
+                    Map<ConfigKey,RawValue> targetValues = new EnumMap<>(ConfigKey.class);
+                    targetValues.put(ConfigKey.NR_ADVANCED_BANDS,workspace.currentValue(target,ConfigKey.NR_ADVANCED_BANDS));
+                    changes.put(ConfigKey.NR_ADVANCED_BANDS,RadioDisplayProfiles.target(RadioDisplayProfiles.Name.NR_ADVANCED,targetValues).get(ConfigKey.NR_ADVANCED_BANDS));
+                }
                 plans.put(target,Map.copyOf(changes));
                 review.append("\n\n").append(activity.getString(R.string.sim,targetSim.getInt("slot")+1,targetSim.getString("carrier"),str(targetSim.getBoolean("embedded") ? R.string.esim : R.string.physical)));
                 for (var change : changes.entrySet()) review.append("\n").append(label(change.getKey())).append(": ").append(value(workspace.currentValue(target,change.getKey()))).append(" → ").append(value(change.getValue()));
@@ -258,7 +273,7 @@ final class FeaturePanels {
         ensureDraftIdentity();
         if (enabled) {
             Map<ConfigKey,RawValue> previous = RadioDisplayProfiles.overlayBeforeEnable(profile,draft);
-            saveChanges(RadioDisplayProfiles.target(profile));
+            saveChanges(RadioDisplayProfiles.target(profile,profileValues(profile,true)));
             profileDraftBaselines.putIfAbsent(profile,previous); profileRestores.remove(profile);
         } else if (RadioDisplayProfiles.state(profile,profileValues(profile,false)) != RadioDisplayProfiles.State.ON) {
             Map<ConfigKey,RawValue> previous = profileDraftBaselines.getOrDefault(profile,Map.of());
@@ -307,7 +322,7 @@ final class FeaturePanels {
             case VOWIFI, WIFI_ONLY, WFC_MODE, WFC_ROAMING_MODE, WFC_ROAMING, EDITABLE_WFC, EDITABLE_WFC_ROAMING -> 1;
             case ADVANCED_CALLING_USER, WFC_USER, WFC_USER_MODE, WFC_USER_ROAMING_MODE, WFC_USER_ROAMING, VT_USER, CROSS_SIM_USER, VONR_USER -> 2;
             case NR_AVAILABILITY, NR_RSRP, NR_RSRQ, NR_SINR, NR_SIGNAL_METRICS, NR_NSA_LTE_SIGNAL -> 3;
-            case NR_ICON, NR_ADVANCED_BANDWIDTH, LTE_PLUS_BANDWIDTH, LTE, HIDE_LTE_PLUS, SHOW_4G, SHOW_4G_LTE, EDITABLE_LTE, HIDE_LTE_SETTING -> 4;
+            case NR_ICON, NR_ADVANCED_BANDWIDTH, NR_ADVANCED_BANDS, NR_ADVANCED_PCO, NR_ADVANCED_INCLUDE_LTE, LTE_PLUS_BANDWIDTH, LTE, HIDE_LTE_PLUS, SHOW_4G, SHOW_4G_LTE, EDITABLE_LTE, HIDE_LTE_SETTING -> 4;
             default -> 5;
         };
     }
@@ -468,7 +483,7 @@ final class FeaturePanels {
             text(activity.getString(R.string.default_data,str(observed.getBoolean("defaultData") ? R.string.yes : R.string.no)));
             text(activity.getString(R.string.sim_country,observed.getString("country",str(R.string.unknown))));
             text(activity.getString(R.string.rat,observed.containsKey("dataRat") ? Integer.toString(observed.getInt("dataRat")) : str(R.string.unknown)));
-            for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","nrState","nrConnected","psRegistered","psRat","displayBaseRat","displayOverride","dataRat","voiceRat","callState")) MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),String.valueOf(observed.containsKey(key) ? observed.get(key) : str(R.string.unknown)),null));
+            for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","nrState","nrConnected","psRegistered","psRat","displayBaseRat","displayOverride","dataRat","voiceRat","callState","nrRsrpDbm","nrFrameworkLevel","lteRsrpDbm")) MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),String.valueOf(observed.containsKey(key) ? observed.get(key) : str(R.string.unknown)),null));
             Long user = observed.containsKey("mask_USER") ? observed.getLong("mask_USER") : null;
             Long power = observed.containsKey("mask_POWER") ? observed.getLong("mask_POWER") : null;
             Long carrier = observed.containsKey("mask_CARRIER") ? observed.getLong("mask_CARRIER") : null;
@@ -514,6 +529,9 @@ final class FeaturePanels {
         case "voice" -> R.string.diag_voice;
         case "video" -> R.string.diag_video;
         case "ut" -> R.string.diag_ut;
+        case "nrRsrpDbm" -> R.string.diag_nr_rsrp;
+        case "nrFrameworkLevel" -> R.string.diag_nr_level;
+        case "lteRsrpDbm" -> R.string.diag_lte_rsrp;
         case "nrState" -> R.string.diag_nr_state;
         case "nrConnected" -> R.string.diag_nr_connected;
         case "psRegistered" -> R.string.diag_ps_registered;

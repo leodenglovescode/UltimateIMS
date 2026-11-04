@@ -13,10 +13,9 @@ public final class Presets {
             if (api >= 34) { values.put(ConfigKey.VONR, RawValue.bool(false)); values.put(ConfigKey.VONR_USER, RawValue.integer(0)); }
         } else {
             values.put(ConfigKey.NR_AVAILABILITY, RawValue.integers(List.of(1,2)));
-            values.put(ConfigKey.NR_RSRP, RawValue.integers(List.of(-110,-100,-90,-80)));
             values.put(ConfigKey.VT, RawValue.bool(true));
             if (api >= 34) values.put(ConfigKey.VONR, RawValue.bool(true));
-            if (name == Name.CHINA_5G) { values.put(ConfigKey.NR_ADVANCED_BANDWIDTH, RawValue.integer(20000)); values.put(ConfigKey.NR_ICON,RawValue.string("connected_mmwave:5G_Plus,connected:5G")); values.put(ConfigKey.HIDE_LTE_PLUS, RawValue.bool(false)); }
+            if (name == Name.CHINA_5G) { values.putAll(RadioDisplayProfiles.target(RadioDisplayProfiles.Name.NR_ADVANCED)); values.putAll(RadioDisplayProfiles.target(RadioDisplayProfiles.Name.MAINLAND_BARS)); values.put(ConfigKey.HIDE_LTE_PLUS, RawValue.bool(false)); }
         }
         if (name == Name.CALLING_AVAILABLE) for (ConfigKey key : List.of(ConfigKey.VOWIFI,ConfigKey.WIFI_ONLY,ConfigKey.VT,ConfigKey.CROSS_SIM,ConfigKey.UT)) values.put(key, RawValue.bool(true));
         return Map.copyOf(values);

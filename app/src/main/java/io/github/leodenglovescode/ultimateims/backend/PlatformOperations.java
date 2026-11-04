@@ -194,6 +194,20 @@ public final class PlatformOperations {
                     item.putLong("mask_" + reason, phone.getAllowedNetworkTypesForReason(code));
                 } catch (Exception e) { readFailure("network-policy-" + reason, e); }
             }
+            // 信号测量仅在本机诊断显示；分享报告白名单不包含这些字段。
+            try {
+                SignalStrength signal = phone.getSignalStrength();
+                if (signal != null) {
+                    List<CellSignalStrengthNr> nr = signal.getCellSignalStrengths(CellSignalStrengthNr.class);
+                    if (!nr.isEmpty()) {
+                        CellSignalStrengthNr value = nr.get(0);
+                        if (value.getSsRsrp() != CellInfo.UNAVAILABLE) item.putInt("nrRsrpDbm",value.getSsRsrp());
+                        if (value.getSsRsrp() != CellInfo.UNAVAILABLE) item.putInt("nrFrameworkLevel",value.getLevel());
+                    }
+                    List<CellSignalStrengthLte> lte = signal.getCellSignalStrengths(CellSignalStrengthLte.class);
+                    if (!lte.isEmpty() && lte.get(0).getRsrp() != CellInfo.UNAVAILABLE) item.putInt("lteRsrpDbm",lte.get(0).getRsrp());
+                }
+            } catch (Exception e) { readFailure("signal-measurement",e); }
             try { item.putInt("dataRat", phone.getDataNetworkType()); item.putInt("voiceRat", phone.getVoiceNetworkType()); item.putInt("callState", phone.getCallState()); } catch (Exception e) { /* 未知。 */ }
             try {
                 ServiceState state = (ServiceState) PlatformMethods.invoke(phone,"getServiceState",ServiceState.class,new Class<?>[]{int.class}, PlatformMethods.intField("android.telephony.TelephonyManager","INCLUDE_LOCATION_DATA_NONE"));

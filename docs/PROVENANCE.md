@@ -3,3 +3,5 @@
 UltimateIMS 使用独立 applicationId 与架构。需求参考公开 IMS 工具的功能描述，并依据 Android/AOSP API 独立实现；不移植参考应用的代码、资源、构建脚本或捆绑二进制。
 
 标准依赖从官方来源获取并保留许可证。具体功能完成度以本提交源码为准，不以开发记录或开关代替设备通信验证。
+
+为比较兼容行为，已检查 Carrier IMS 与 TensorIMS 的部分实现；未复制或移植实现代码，不使用 clean-room 声明。
