@@ -232,6 +232,7 @@ final class FeaturePanels {
             MaterialUi.add(body,MaterialUi.row(activity,str(R.string.network_status),network,null));
             if (observed.containsKey("identityError")) MaterialUi.add(body,MaterialUi.row(activity,str(R.string.sim_access),str(R.string.access_blocked),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.sim_access).setMessage(observed.getString("identityError")).setPositiveButton(R.string.confirm,null).show()));
         }
+        persistentVolte();
         section(R.string.radio_controls);
         for (ConfigKey key : ConfigKey.values()) if (radioKey(key) && Build.VERSION.SDK_INT >= key.minApi) {
             if (key == ConfigKey.NR_AVAILABILITY) { nrSwitch(1,R.string.nr_nsa_toggle); nrSwitch(2,R.string.nr_sa_toggle); }
@@ -426,10 +427,29 @@ final class FeaturePanels {
                     });
                 })).show();
     }
+    private void persistentVolte() {
+        section(R.string.persistent_section);
+        Bundle sim = workspace.selected(sub);
+        var state = PersistentVolteState.read(workspace.currentValue(sub,ConfigKey.VOIMS_OPT_IN),workspace.currentValue(sub,ConfigKey.ADVANCED_CALLING_USER));
+        boolean saved = sim != null && sim.getBoolean("persistentOriginalsSaved");
+        boolean recovery = sim == null || sim.getBoolean("recoveryRequired") || sim.getBoolean("recoveryStateUnknown");
+        boolean enabled = PersistentVolteState.canToggle(state,workspace.backend.ready(),workspace.busy(),recovery,saved);
+        var toggle = MaterialUi.switchRow(body,str(R.string.persistent_switch),state == PersistentVolteState.State.ON,enabled,on -> safe(() -> {
+            // 对话框取消或操作尚未核验时，开关继续显示实时值。
+            redraw.run();
+            confirm(str(on ? R.string.persistent_confirm_enable : R.string.persistent_confirm_restore),() -> workspace.persistentVolte(sub,on));
+        }));
+        toggle.setStateDescription(str(state == PersistentVolteState.State.UNKNOWN ? R.string.unknown : state == PersistentVolteState.State.ON ? R.string.true_value : R.string.false_value));
+        toggle.setTooltipText(str(R.string.persistent_help));
+        MaterialUi.divider(body);
+        int detail = state == PersistentVolteState.State.UNKNOWN ? R.string.connect_to_read : recovery ? R.string.persistent_recovery_needed : state == PersistentVolteState.State.ON && !saved ? R.string.persistent_no_originals : R.string.persistent_hint;
+        MaterialUi.add(body,MaterialUi.row(activity,str(detail),str(R.string.learn_more),() -> {
+            if (state != PersistentVolteState.State.UNKNOWN && recovery) { activity.openRecoveryPage(); return; }
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.persistent_section)
+                    .setMessage(R.string.persistent_help).setPositiveButton(R.string.confirm,null).show();
+        }));
+    }
     void recovery() {
-        section(R.string.persistent_section); text(str(R.string.persistent_explain));
-        button(R.string.persistent_enable, () -> confirm(str(R.string.persistent_explain),() -> workspace.persistentVolte(sub,true)),writable() && sub >= 0);
-        button(R.string.persistent_restore, () -> confirm(str(R.string.selective_restore),() -> workspace.persistentVolte(sub,false)),writable() && sub >= 0);
         section(R.string.restore_section);
         button(R.string.restore_originals,this::restoreDialog,writable() && sub >= 0);
         button(R.string.history,this::historyDialog,!workspace.busy());

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Ultimate IMS</string>
-    <string name="home">IMS &amp; radio</string>
+    <string name="home">Calling</string>
     <string name="ims">Configuration</string>
     <string name="diagnostics">Connection details</string>
     <string name="system">System network</string>
@@ -41,7 +41,7 @@
     <string name="root">Root</string>
     <string name="backend_choose">Backend</string>
     <string name="language">App language</string>
-    <string name="auto">Auto · follow system</string>
+    <string name="auto">Follow system</string>
     <string name="english">English</string>
     <string name="chinese">简体中文</string>
     <string name="yes">Yes</string>
@@ -62,9 +62,6 @@
     <string name="all_sims">Apply to all SIMs</string>
     <string name="presets">Presets</string>
     <string name="clear_draft">Discard changes</string>
-    <string name="persistent_enable">Enable persistent VoLTE for this SIM</string>
-    <string name="persistent_restore">Disable persistent VoLTE by restoring originals</string>
-    <string name="persistent_explain">Subscription VoIMS opt-in and advanced-calling user values are separate from CarrierConfig reapply. VoNR is not changed incidentally. Reboot/call behavior must be verified on your firmware.</string>
     <string name="restore_originals">Restore selected original fields</string>
     <string name="history">Load a history entry as a draft</string>
     <string name="restart">Request IMS restart for this SIM</string>
@@ -161,12 +158,12 @@
     <string name="nr_nsa_observed">LTE packet registration with a connected secondary NR is observed, indicating NSA. Display icons remain a separate observation.</string>
     <string name="nr_registration_unknown">NR registration is unknown or not established by the current observations. A 5G icon or enabled setting alone cannot establish it.</string>
     <string name="local_network_explain">Android 17 gates local networking with a system permission. Grant it explicitly, then tap Pair or Connect again. UltimateIMS keeps private ADB connections on 127.0.0.1 and does not scan LAN devices. Permission alone does not start pairing or a backend.</string>
-    <string name="nav_home">IMS &amp; radio</string>
-    <string name="nav_ims">Configure</string>
+    <string name="nav_home">Calling</string>
+    <string name="nav_ims">Setup</string>
     <string name="nav_diagnostics">Diagnose</string>
     <string name="nav_network">Network</string>
     <string name="nav_tools">Tools</string>
-    <string name="appearance">Appearance &amp; language</string>
+    <string name="appearance">Appearance</string>
     <string name="dynamic_color">Use wallpaper colors</string>
     <string name="dynamic_color_explain">Optional Material You colors from your wallpaper, in both light and dark themes.</string>
     <string name="device_section">Device overview</string>
@@ -258,4 +255,13 @@
     <string name="key_wfc_icon">Show Wi-Fi calling icon</string>
     <string name="key_cross_sim_opportunistic">Allow opportunistic Cross-SIM calling</string>
     <string name="key_enhanced_lte_default">Enhanced LTE default preference</string>
+    <string name="language_auto_current">Follow system · %1$s</string>
+    <string name="persistent_switch">Keep VoLTE after restart</string>
+    <string name="persistent_hint">Selected SIM only</string>
+    <string name="persistent_no_originals">Enabled · no saved originals to restore</string>
+    <string name="persistent_recovery_needed">Review recovery before changing</string>
+    <string name="persistent_confirm_enable">Save the original subscription values and enable persistent VoLTE for this SIM? Reboot behavior still depends on your firmware.</string>
+    <string name="persistent_confirm_restore">Restore the saved original VoLTE subscription values for this SIM?</string>
+    <string name="persistent_help">Stores VoIMS opt-in and the advanced-calling preference for the selected SIM. Once applied on supported firmware, restoring these values after a restart does not require Shizuku or Wi-Fi. It does not enable carrier provisioning or guarantee calls. Turning off restores saved originals; missing originals are never guessed.</string>
+    <string name="learn_more">Details</string>
 </resources>

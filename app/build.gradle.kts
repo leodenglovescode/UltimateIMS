@@ -2,13 +2,15 @@ plugins { id("com.android.application") }
 android {
     namespace = "io.github.leodenglovescode.ultimateims"
     compileSdk = 37
+    // 两种语言始终随包提供，切换不依赖下载。
+    bundle { language { enableSplit = false } }
     defaultConfig {
         applicationId = "io.github.leodenglovescode.ultimateims"
         minSdk = 33
         targetSdk = 37
         ndk { abiFilters += setOf("arm64-v8a", "x86_64") }
-        versionCode = 15
-        versionName = "0.7.0-dev"
+        versionCode = 16
+        versionName = "0.8.0-dev"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

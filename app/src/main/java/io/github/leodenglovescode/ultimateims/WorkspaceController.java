@@ -49,7 +49,7 @@ public final class WorkspaceController {
         if (!backend.ready()) { current = null; notifyChanged(); return; }
         if (!busy) task("Reading privileged live values", () -> {
             Bundle firstRead = backend.takeInitialSnapshot();
-            if (firstRead != null) current = firstRead; else refreshNow();
+            if (firstRead != null) publishSnapshot(firstRead); else refreshNow();
             if (preferences().getBoolean("auto_restore", false)) autoRestore();
         });
     }
@@ -63,7 +63,25 @@ public final class WorkspaceController {
         if (!result.getBoolean("ok", false)) throw new IllegalStateException(result.getString("error", "Backend rejected operation"));
         return result;
     }
-    private void refreshNow() throws Exception { current = null; current = checked(Protocol.SNAPSHOT, new Bundle()); }
+    private void refreshNow() throws Exception { current = null; publishSnapshot(checked(Protocol.SNAPSHOT, new Bundle())); }
+    private void publishSnapshot(Bundle next) {
+        ArrayList<Bundle> sims = next.getParcelableArrayList("sims",Bundle.class);
+        try { storage(); }
+        catch (Exception error) {
+            if (sims != null) for (Bundle sim : sims) sim.putBoolean("recoveryStateUnknown",true);
+            current = next; return;
+        }
+        if (sims != null) for (Bundle sim : sims) {
+            try {
+                String iccid = sim.getString("iccid");
+                if (iccid == null || sim.containsKey("identityError")) continue;
+                RecoveryJournal.Entry entry = journal.read(identities.sim(iccid));
+                sim.putBoolean("persistentOriginalsSaved",entry != null && PersistentVolteState.originalsRestorable(entry.originals()));
+                sim.putBoolean("recoveryRequired",entry != null && entry.requiresRecovery());
+            } catch (Exception error) { sim.putBoolean("recoveryStateUnknown",true); }
+        }
+        current = next;
+    }
     private synchronized void storage() throws Exception {
         if (identities == null) identities = new IdentityStore(context);
         if (journal == null) journal = new RecoveryJournal(new java.io.File(context.getNoBackupFilesDir(), "recovery").toPath());

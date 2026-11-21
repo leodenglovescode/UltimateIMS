@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Ultimate IMS</string>
-    <string name="home">IMS 与无线</string>
+    <string name="home">通话</string>
     <string name="ims">配置</string>
     <string name="diagnostics">连接详情</string>
     <string name="system">系统网络</string>
@@ -62,9 +62,6 @@
     <string name="all_sims">应用到所有 SIM</string>
     <string name="presets">预设</string>
     <string name="clear_draft">放弃更改</string>
-    <string name="persistent_enable">为此 SIM 启用持久化 VoLTE</string>
-    <string name="persistent_restore">恢复原值以关闭持久化 VoLTE</string>
-    <string name="persistent_explain">订阅 VoIMS opt-in 和高级通话用户值独立于 CarrierConfig 重应用。不会顺带修改 VoNR。重启和通话行为必须在当前固件验证。</string>
     <string name="restore_originals">恢复所选原始字段</string>
     <string name="history">将历史记录载入草稿</string>
     <string name="restart">为此 SIM 请求 IMS 重启</string>
@@ -161,12 +158,12 @@
     <string name="nr_nsa_observed">已观测 LTE 分组注册及已连接的次级 NR，提示 NSA；图标展示仍是独立观测。</string>
     <string name="nr_registration_unknown">当前观测无法确认 NR 注册，或尚未注册 NR；仅凭 5G 图标或开启设置无法证明。</string>
     <string name="local_network_explain">Android 17 通过系统权限限制本地网络。请明确授权后再次点击配对或连接。UltimateIMS 私有 ADB 仅连接 127.0.0.1，不扫描局域网设备。授予权限本身不会配对或启动后端。</string>
-    <string name="nav_home">IMS 与无线</string>
+    <string name="nav_home">通话</string>
     <string name="nav_ims">配置</string>
     <string name="nav_diagnostics">诊断</string>
     <string name="nav_network">网络</string>
     <string name="nav_tools">工具</string>
-    <string name="appearance">外观与语言</string>
+    <string name="appearance">外观</string>
     <string name="dynamic_color">使用壁纸配色</string>
     <string name="dynamic_color_explain">可选的 Material You 壁纸配色，支持浅色和深色主题。</string>
     <string name="device_section">设备概览</string>
@@ -258,4 +255,13 @@
     <string name="key_wfc_icon">显示 Wi-Fi 通话图标</string>
     <string name="key_cross_sim_opportunistic">允许机会数据上的跨 SIM 通话</string>
     <string name="key_enhanced_lte_default">增强 LTE 默认偏好</string>
+    <string name="language_auto_current">跟随系统 · %1$s</string>
+    <string name="persistent_switch">重启后保留 VoLTE</string>
+    <string name="persistent_hint">仅影响所选 SIM</string>
+    <string name="persistent_no_originals">已启用 · 没有可恢复的原值备份</string>
+    <string name="persistent_recovery_needed">请先检查恢复状态</string>
+    <string name="persistent_confirm_enable">保存这张 SIM 的订阅原值并启用持久化 VoLTE？重启后的实际效果仍取决于固件。</string>
+    <string name="persistent_confirm_restore">恢复这张 SIM 已保存的 VoLTE 订阅原值？</string>
+    <string name="persistent_help">将 VoIMS opt-in 和高级通话偏好保存在所选 SIM 的订阅设置中。支持的固件应用后，重启时不需要 Shizuku 或 Wi-Fi 来恢复这些值。不能替代运营商开通或保证通话。关闭时恢复已保存原值，缺少原值时不会猜测。</string>
+    <string name="learn_more">详情</string>
 </resources>

@@ -35,6 +35,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     };
     private FrameworkReader.Snapshot snapshot;
     private int page;
+    private String appliedLanguage;
     private int selectedSub = -1;
     private boolean reading;
     private boolean started;
@@ -49,8 +50,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         void detach() { manager.unregisterCarrierConfigChangeListener(listener); }
     }
     private final BroadcastReceiver powerReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) { refresh(); }
+        @Override public void onReceive(Context context, Intent intent) {
+            if (!Objects.equals(appliedLanguage,LanguagePreferences.resolved(MainActivity.this))) recreate(); else refresh();
+        }
     };
+    @Override protected void attachBaseContext(Context base) {
+        appliedLanguage = LanguagePreferences.resolved(base);
+        super.attachBaseContext(LanguagePreferences.wrap(base));
+    }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         workspace = ((UltimateApplication)getApplication()).workspace();
@@ -85,9 +92,9 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         navigation = new com.google.android.material.bottomnavigation.BottomNavigationView(this);
         navigation.setLabelVisibilityMode(com.google.android.material.navigation.NavigationBarView.LABEL_VISIBILITY_LABELED);
-        int[] destinations = {0,1,3,4};
-        int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_network,R.string.nav_tools};
-        int[] icons = {R.drawable.ic_call,R.drawable.ic_settings,R.drawable.ic_network,R.drawable.ic_tools};
+        int[] destinations = {0,1,3,4,5};
+        int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_network,R.string.nav_tools,R.string.nav_settings};
+        int[] icons = {R.drawable.ic_call,R.drawable.ic_settings,R.drawable.ic_network,R.drawable.ic_tools,R.drawable.ic_settings};
         for (int i=0;i<destinations.length;i++) navigation.getMenu().add(0,100+destinations[i],i,labels[i]).setIcon(icons[i]);
         navigation.setOnItemSelectedListener(item -> { int target = item.getItemId()-100; if (target != page) navigate(target); return true; });
         for (int i=0;i<toolbar.getMenu().size();i++) toolbar.getMenu().getItem(i).setIconTintList(android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurface)));
@@ -119,7 +126,9 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     @Override protected void onStart() {
         super.onStart(); started = true;
         registerReceiver(statusReceiver, new IntentFilter(UltimateApplication.STATUS_CHANGED), Context.RECEIVER_NOT_EXPORTED);
-        registerReceiver(powerReceiver, new IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), Context.RECEIVER_NOT_EXPORTED);
+        IntentFilter systemChanges = new IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+        systemChanges.addAction(Intent.ACTION_LOCALE_CHANGED);
+        registerReceiver(powerReceiver, systemChanges, Context.RECEIVER_NOT_EXPORTED);
         subscriptionListener = new SubscriptionManager.OnSubscriptionsChangedListener() {
             @Override public void onSubscriptionsChanged() { refresh(); }
         };
@@ -128,6 +137,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             try { carrierObservation = new CarrierObservation(); carrierObservation.attach(); }
             catch (SecurityException | UnsupportedOperationException e) { /* 不可订阅时仍支持明确刷新。 */ }
         }
+        if (!Objects.equals(appliedLanguage,LanguagePreferences.resolved(this))) { recreate(); return; }
         refresh();
     }
     @Override protected void onStop() {
@@ -175,8 +185,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         int searchPosition = searchFocused ? ((EditText)focus).getSelectionStart() : -1;
         body = content; body.removeAllViews(); toolbar.setTitle(R.string.app_name); toolbar.setSubtitle(new int[]{R.string.nav_home,R.string.nav_ims,R.string.nav_diagnostics,R.string.nav_network,R.string.nav_tools,R.string.nav_settings}[page]);
         if (drawerNavigation != null) drawerNavigation.setCheckedItem(300+(page == 2 ? 0 : page));
-        if (page < 5) navigation.getMenu().findItem(100+(page == 2 ? 0 : page)).setChecked(true);
-        else for (int i=0;i<navigation.getMenu().size();i++) navigation.getMenu().getItem(i).setChecked(false);
+        navigation.getMenu().findItem(100+(page == 2 ? 0 : page)).setChecked(true);
         renderedPage = page; renderedSub = selectedSub;
         scroll.post(() -> {
             if (searchFocused && page == 1) { View replacement = content.findViewWithTag("config_search"); if (replacement instanceof EditText input) { input.requestFocus(); input.setSelection(Math.min(Math.max(0,searchPosition),input.length())); } }
@@ -235,15 +244,20 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         text(getString(R.string.network_metered, bool(snapshot.unmetered())), false);
     }
     private void settings() {
+        heading(R.string.language);
+        int selectedLanguage = LanguagePreferences.selected(this);
+        String[] languages = {getString(R.string.auto),getString(R.string.english),getString(R.string.chinese)};
+        String description = selectedLanguage == 0 ? getString(R.string.language_auto_current,LanguagePreferences.resolved(this).equals("zh-CN") ? "简体中文" : "English") : languages[selectedLanguage];
+        MaterialUi.add(body,MaterialUi.row(this,getString(R.string.language),description,() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.language).setSingleChoiceItems(languages,LanguagePreferences.selected(this),(dialog,index) -> {
+                    dialog.dismiss(); LanguagePreferences.select(this,index); recreate();
+                }).setNegativeButton(R.string.cancel,null).show()));
         heading(R.string.appearance);
         text(getString(R.string.theme_system_automatic),false);
         com.google.android.material.materialswitch.MaterialSwitch dynamic = new com.google.android.material.materialswitch.MaterialSwitch(this);
         dynamic.setText(R.string.dynamic_color); dynamic.setMinHeight(dp(56)); dynamic.setChecked(ThemePreferences.dynamic(this));
         dynamic.setOnCheckedChangeListener((v,checked) -> { ThemePreferences.setDynamic(this,checked); recreate(); }); MaterialUi.add(body,dynamic);
         text(getString(R.string.dynamic_color_explain),false);
-        button(R.string.language, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.language)
-                .setItems(new String[]{getString(R.string.auto),getString(R.string.english),getString(R.string.chinese)}, (d, index) ->
-                    getSystemService(LocaleManager.class).setApplicationLocales(index == 0 ? LocaleList.getEmptyLocaleList() : LocaleList.forLanguageTags(index == 1 ? "en" : "zh-CN"))).show());
         panels.attach(content,selectedSub); panels.about();
         body = content; heading(R.string.privacy_section); text(getString(R.string.privacy),false);
     }
@@ -262,6 +276,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         return chosen.isEmpty() ? null : BackendSession.Mode.valueOf(chosen);
     }
     void openImsPage() { navigate(1); }
+    void openRecoveryPage() { navigate(4); }
     void openConfigurationPage() { navigate(1); }
     boolean configurationVisible() { return page == 1; }
     @Override protected void onActivityResult(int request, int result, Intent data) { super.onActivityResult(request,result,data); panels.fileResult(request,result,data); }
