@@ -21,7 +21,8 @@ An independent Android app for managing IMS and connectivity settings per SIM. B
 - Separate NSA/SA configuration, 5G+ display options, and signal-bar thresholds.
 - Persistent VoLTE settings on supported firmware, with per-SIM original-value backups and recovery.
 - Captive-portal settings, reviewed APN profiles, local diagnostics, and an optional SIM-region compatibility setting.
-- English and Simplified Chinese; system-following language and light/dark appearance.
+- English and Simplified Chinese, with automatic language selection.
+- Material or frosted-glass styling, system/light/dark themes, and a private photo background.
 
 **Get started**
 
@@ -43,7 +44,8 @@ No analytics, ads, telemetry, or automatic uploads. Network probes, public-IP qu
 - 独立的 NSA/SA 配置、5G+ 显示选项和信号格门槛。
 - 支持固件上的持久化 VoLTE，包含逐卡原值备份与恢复。
 - 联网检测门户、已审阅 APN、本地诊断，以及可选的 SIM 地区兼容设置。
-- 英语与简体中文，语言及浅深色外观可跟随系统。
+- 英语与简体中文，语言可跟随系统。
+- Material 或磨砂玻璃风格，系统/浅色/深色主题，以及私有照片背景。
 
 **开始使用**
 

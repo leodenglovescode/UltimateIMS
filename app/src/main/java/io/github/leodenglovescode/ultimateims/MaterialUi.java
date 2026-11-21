@@ -15,7 +15,14 @@ import com.google.android.material.textview.MaterialTextView;
 final class MaterialUi {
     private MaterialUi() { }
     static int dp(Context c, int value) { return Math.round(value*c.getResources().getDisplayMetrics().density); }
-    static int color(Context c, int attr) { return MaterialColors.getColor(c,attr,"UltimateIMS"); }
+    static int color(Context c, int attr) {
+        if (ThemePreferences.glassActive(c)) {
+            if (attr == com.google.android.material.R.attr.colorOnSurface) return ThemePreferences.dark(c) ? 0xfff5f7fc : 0xff142033;
+            if (attr == com.google.android.material.R.attr.colorOnSurfaceVariant) return ThemePreferences.dark(c) ? 0xffe1e8f2 : 0xff34445b;
+        }
+        return MaterialColors.getColor(c,attr,"UltimateIMS");
+    }
+    static int rowHeight(Context c) { return dp(c,ThemePreferences.compact(c) ? 48 : 56); }
     static LinearLayout column(Context c) { LinearLayout v = new LinearLayout(c); v.setOrientation(LinearLayout.VERTICAL); return v; }
     static void add(LinearLayout parent, View child) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1,-2); params.bottomMargin = dp(parent.getContext(),6); parent.addView(child,params);
@@ -24,12 +31,20 @@ final class MaterialUi {
         MaterialTextView v = new MaterialTextView(c); v.setText(value);
         TextViewCompat.setTextAppearance(v,heading ? com.google.android.material.R.style.TextAppearance_Material3_TitleLarge : com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
         v.setTextColor(color(c,com.google.android.material.R.attr.colorOnSurface)); v.setLineSpacing(dp(c,3),1);
+        if (ThemePreferences.glassActive(c)) {
+            float density = c.getResources().getDisplayMetrics().density;
+            v.setShadowLayer(.65f*density,0,.25f*density,ThemePreferences.dark(c) ? 0x50000000 : 0x40ffffff);
+        }
         v.setAccessibilityHeading(heading); v.setTextIsSelectable(!heading); v.setPadding(0,dp(c,4),0,dp(c,4)); return v;
     }
     static LinearLayout card(LinearLayout parent, String title) {
         // 平面分组取代逐项卡片；标题和留白建立层级。
-        Context c = parent.getContext(); LinearLayout contents = column(c);
-        contents.setPadding(0,dp(c,8),0,dp(c,4)); add(parent,contents);
+        Context c = parent.getContext();
+        boolean glass = ThemePreferences.glassActive(c) && title != null;
+        LinearLayout contents = glass ? new GlassSurface(c,28) : column(c);
+        int inset = glass ? dp(c,16) : 0;
+        contents.setPadding(inset,dp(c,12),inset,dp(c,10));
+        add(parent,contents);
         if (title != null) add(contents,text(c,title,true)); return contents;
     }
     static void divider(LinearLayout parent) {
@@ -39,6 +54,12 @@ final class MaterialUi {
     static MaterialButton button(Context c, int label, Runnable action, boolean primary) {
         int style = primary ? com.google.android.material.R.attr.materialButtonStyle : com.google.android.material.R.attr.materialButtonOutlinedStyle;
         MaterialButton v = new MaterialButton(c,null,style); v.setText(label); v.setAllCaps(false); v.setMinHeight(dp(c,56)); v.setMaxLines(4);
+        if (ThemePreferences.glassActive(c)) {
+            v.setCornerRadius(dp(c,28));
+            v.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemePreferences.dark(c) ? 0x20ffffff : 0x60ffffff));
+            v.setStrokeColor(android.content.res.ColorStateList.valueOf(0x70ffffff)); v.setStrokeWidth(dp(c,1));
+            v.setTextColor(color(c,com.google.android.material.R.attr.colorOnSurface));
+        }
         if (label == R.string.reset) {
             int error = color(c,androidx.appcompat.R.attr.colorError); v.setTextColor(error); v.setStrokeColor(android.content.res.ColorStateList.valueOf(error));
         }
@@ -58,7 +79,7 @@ final class MaterialUi {
     }
     static View row(Context c, String title, String supporting, Runnable action) {
         LinearLayout row = new LinearLayout(c); row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(0,dp(c,8),0,dp(c,8)); row.setMinimumHeight(dp(c,56));
+        row.setPadding(0,dp(c,8),0,dp(c,8)); row.setMinimumHeight(rowHeight(c));
         TextView label = text(c,title,false); label.setTextIsSelectable(false);
         row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
         if (supporting != null && !supporting.isBlank()) {
@@ -79,8 +100,15 @@ final class MaterialUi {
     static com.google.android.material.materialswitch.MaterialSwitch switchRow(LinearLayout parent, String title, boolean checked, boolean enabled, java.util.function.Consumer<Boolean> change) {
         Context c = parent.getContext();
         var toggle = new com.google.android.material.materialswitch.MaterialSwitch(c);
-        toggle.setText(title); toggle.setMinHeight(dp(c,56)); toggle.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        toggle.setText(title); toggle.setMinHeight(rowHeight(c)); toggle.setGravity(android.view.Gravity.CENTER_VERTICAL);
         TextViewCompat.setTextAppearance(toggle,com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
+        if (ThemePreferences.glassActive(c)) {
+            int[][] states = {{-android.R.attr.state_enabled},{android.R.attr.state_checked},{}};
+            toggle.setTrackTintList(new android.content.res.ColorStateList(states,new int[]{0x30ffffff,ThemePreferences.dark(c) ? 0xff75daed : 0xff157ba8,0x45ffffff}));
+            toggle.setTrackDecorationTintList(android.content.res.ColorStateList.valueOf(0x55ffffff));
+            toggle.setThumbTintList(new android.content.res.ColorStateList(states,new int[]{0x90ffffff,0xfff8fcff,0xffe8eef4}));
+            toggle.setTextColor(color(c,com.google.android.material.R.attr.colorOnSurface));
+        }
         toggle.setChecked(checked); toggle.setEnabled(enabled);
         toggle.setOnCheckedChangeListener((view,value) -> change.accept(value));
         parent.addView(toggle,new LinearLayout.LayoutParams(-1,-2));
@@ -93,6 +121,10 @@ final class MaterialUi {
         Choice(Context c, String label, java.util.List<String> options, int initial, java.util.function.IntConsumer callback) {
             super(c,null,com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle);
             setHint(label); setEndIconMode(TextInputLayout.END_ICON_DROPDOWN_MENU);
+            if (ThemePreferences.glassActive(c)) {
+                float corner = dp(c,24); setBoxCornerRadii(corner,corner,corner,corner);
+                setBoxBackgroundColor(ThemePreferences.dark(c) ? 0x20000000 : 0x30ffffff);
+            }
             field = new MaterialAutoCompleteTextView(getContext()); field.setInputType(0); field.setSingleLine(false); field.setMaxLines(3); field.setHorizontallyScrolling(false); field.setMinHeight(dp(c,56));
             field.setAdapter(new ArrayAdapter<>(c,R.layout.dropdown_item,options));
             addView(field,new LinearLayout.LayoutParams(-1,-2)); selection = initial;

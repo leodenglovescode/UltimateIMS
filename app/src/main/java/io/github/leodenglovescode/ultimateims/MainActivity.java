@@ -23,12 +23,15 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     private com.google.android.material.bottomnavigation.BottomNavigationView navigation;
     private com.google.android.material.appbar.MaterialToolbar toolbar;
     private ScrollView scroll;
+    private View navigationContainer;
+    private AppearanceBackground.Scene appearanceScene;
     private com.google.android.material.navigation.NavigationView drawerNavigation;
     private androidx.drawerlayout.widget.DrawerLayout drawer;
     private LinearLayout content;
     private int renderedPage = -1;
     private int renderedSub = -1;
     private FeaturePanels panels;
+    private AppearanceSettings appearance;
     private WorkspaceController workspace;
     private final BroadcastReceiver statusReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { render(); }
@@ -62,6 +65,8 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        appearance = new AppearanceSettings(this);
+        applyScreenPreference();
         androidx.activity.EdgeToEdge.enable(this,
                 androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT),
                 androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT));
@@ -76,14 +81,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (savedInstanceState != null) { if (configurationRecreation) page = savedInstanceState.getInt("page"); selectedSub = savedInstanceState.getInt("sim", -1); }
         page = Math.max(0,Math.min(page,pages.length-1));
         LinearLayout root = MaterialUi.column(this);
-        root.setBackgroundColor(MaterialUi.color(this,com.google.android.material.R.attr.colorSurface));
+        root.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             var bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
             var keyboard = insets.getInsets(WindowInsets.Type.ime());
             // BottomNavigationView 自己处理底部系统栏，根节点不能再重复留白。
             boolean imeVisible = insets.isVisible(WindowInsets.Type.ime());
-            v.setPadding(bars.left,bars.top,bars.right,imeVisible ? keyboard.bottom : drawer != null ? bars.bottom : 0);
-            if (navigation != null && drawer == null) navigation.setVisibility(imeVisible ? View.GONE : View.VISIBLE);
+            v.setPadding(bars.left,bars.top,bars.right,imeVisible ? keyboard.bottom : drawer != null || ThemePreferences.glassActive(this) ? bars.bottom : 0);
+            if (navigationContainer != null && drawer == null) navigationContainer.setVisibility(imeVisible ? View.GONE : View.VISIBLE);
             return insets.inset(bars.left,bars.top,bars.right,0);
         });
         boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
@@ -93,7 +98,15 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         toolbar.getMenu().add(0,200,0,R.string.refresh).setIcon(R.drawable.ic_refresh).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         toolbar.getMenu().add(0,201,1,R.string.settings).setIcon(R.drawable.ic_settings).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         toolbar.setOnMenuItemClickListener(item -> { if (item.getItemId() == 200) refresh(); else navigate(5); return true; });
-        root.addView(toolbar,new LinearLayout.LayoutParams(-1,-2));
+        toolbar.setBackgroundColor(appearanceChrome());
+        toolbar.setTitleTextColor(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurface));
+        toolbar.setSubtitleTextColor(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurfaceVariant));
+        if (ThemePreferences.glassActive(this)) {
+            GlassSurface header = new GlassSurface(this,28);
+            header.addView(toolbar,new LinearLayout.LayoutParams(-1,-2));
+            var headerParams = new LinearLayout.LayoutParams(-1,-2); headerParams.setMargins(dp(12),dp(6),dp(12),dp(4));
+            root.addView(header,headerParams);
+        } else root.addView(toolbar,new LinearLayout.LayoutParams(-1,-2));
         scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false);
         content = MaterialUi.column(this); body = content;
         content.setPadding(dp(16),dp(12),dp(16),dp(24)); scroll.addView(content);
@@ -104,7 +117,15 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         });
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         navigation = new com.google.android.material.bottomnavigation.BottomNavigationView(this);
-        navigation.setBackgroundTintList(android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorSurfaceContainer)));
+        navigation.setBackgroundTintList(android.content.res.ColorStateList.valueOf(appearanceChrome()));
+        if (ThemePreferences.glassActive(this)) {
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(navigation,(view,insets) -> insets);
+            navigation.setPadding(dp(4),dp(4),dp(4),dp(4));
+            navigation.setElevation(0);
+            var ink = android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurface));
+            navigation.setItemIconTintList(ink); navigation.setItemTextColor(ink);
+            navigation.setItemActiveIndicatorColor(android.content.res.ColorStateList.valueOf(ThemePreferences.dark(this) ? 0x38ffffff : 0x70ffffff));
+        }
         navigation.setLabelVisibilityMode(com.google.android.material.navigation.NavigationBarView.LABEL_VISIBILITY_LABELED);
         int[] destinations = {0,1,3,4,5};
         int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_network,R.string.nav_tools,R.string.nav_settings};
@@ -113,7 +134,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         navigation.setOnItemSelectedListener(item -> { int target = item.getItemId()-100; if (target != page) navigate(target); return true; });
         for (int i=0;i<toolbar.getMenu().size();i++) toolbar.getMenu().getItem(i).setIconTintList(android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorOnSurface)));
         if (getResources().getConfiguration().fontScale >= 1.3f || getResources().getConfiguration().screenWidthDp >= 600) {
-            drawer = new androidx.drawerlayout.widget.DrawerLayout(this); drawer.addView(root,new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(-1,-1));
+            drawer = new androidx.drawerlayout.widget.DrawerLayout(this); drawer.addView(decorateRoot(root),new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(-1,-1));
             drawerNavigation = new com.google.android.material.navigation.NavigationView(this); drawerNavigation.setItemMaxLines(3);
             drawerNavigation.setFitsSystemWindows(true);
             int[] drawerPages = {0,1,3,4,5};
@@ -130,7 +151,15 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
                 @Override public void onDrawerClosed(View view) { back.setEnabled(false); }
             });
             setContentView(drawer);
-        } else { root.addView(navigation,new LinearLayout.LayoutParams(-1,-2)); setContentView(root); }
+        } else {
+            if (ThemePreferences.glassActive(this)) {
+                GlassSurface dock = new GlassSurface(this,32);
+                dock.addView(navigation,new LinearLayout.LayoutParams(-1,-2));
+                var dockParams = new LinearLayout.LayoutParams(-1,-2); dockParams.setMargins(dp(12),dp(6),dp(12),dp(8));
+                root.addView(dock,dockParams); navigationContainer = dock;
+            } else { root.addView(navigation,new LinearLayout.LayoutParams(-1,-2)); navigationContainer = navigation; }
+            setContentView(decorateRoot(root));
+        }
         render();
     }
     @Override protected void onNewIntent(Intent intent) {
@@ -163,7 +192,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         refresh();
     }
     @Override protected void onStop() {
-        returnToCalling = !isChangingConfigurations();
+        returnToCalling = !isChangingConfigurations() && !appearance.busy();
         updateAutoConnection(false);
         started = false; readGeneration++;
         unregisterReceiver(powerReceiver); unregisterReceiver(statusReceiver);
@@ -285,13 +314,21 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         }).setTooltipText(getString(R.string.auto_connect_help));
         text(getString(R.string.auto_connect_help),false);
         heading(R.string.appearance);
-        text(getString(R.string.theme_system_automatic),false);
-        com.google.android.material.materialswitch.MaterialSwitch dynamic = new com.google.android.material.materialswitch.MaterialSwitch(this);
-        dynamic.setText(R.string.dynamic_color); dynamic.setMinHeight(dp(56)); dynamic.setChecked(ThemePreferences.dynamic(this));
-        dynamic.setOnCheckedChangeListener((v,checked) -> { ThemePreferences.setDynamic(this,checked); recreate(); }); MaterialUi.add(body,dynamic);
-        text(getString(R.string.dynamic_color_explain),false);
+        appearance.show(body);
         panels.attach(content,selectedSub); panels.about();
         body = content; heading(R.string.privacy_section); text(getString(R.string.privacy),false);
+    }
+    void finishAppearancePicker() { returnToCalling = false; }
+    void redrawAppearanceSettings() { if (!isDestroyed()) render(); }
+    void applyScreenPreference() {
+        if (ThemePreferences.keepAwake(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+    private View decorateRoot(View foreground) { appearanceScene = AppearanceBackground.wrap(this,foreground); return appearanceScene; }
+    void updateAppearancePreview() { if (appearanceScene != null) appearanceScene.refresh(); }
+    private int appearanceChrome() {
+        int color = MaterialUi.color(this,com.google.android.material.R.attr.colorSurfaceContainer);
+        return ThemePreferences.glassActive(this) ? android.graphics.Color.TRANSPARENT : color;
     }
     private void backendSetup() {
         BackendSession.Mode chosen = chosenBackend();

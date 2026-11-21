@@ -410,6 +410,10 @@ final class FeaturePanels {
 
     }
     void about() {
+        section(R.string.about_app);
+        text(activity.getString(R.string.app_version,BuildConfig.VERSION_NAME));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.author_credit),"leodenglovescode",() -> activity.startActivity(
+                new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://github.com/leodenglovescode")))));
         section(R.string.licenses);
         button(R.string.licenses, () -> {
             try { StringBuilder contents = new StringBuilder(); for (String name : activity.getAssets().list("licenses")) { contents.append(name).append("\n\n"); try (var input = activity.getAssets().open("licenses/"+name)) { contents.append(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).append("\n\n"); } }
