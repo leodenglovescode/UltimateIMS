@@ -17,6 +17,9 @@ public final class WorkspaceController {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private volatile Bundle current;
     private volatile boolean busy;
+    public enum Phase { IDLE, RUNNING, COMPLETED, FAILED_OR_UNKNOWN, BUSY }
+    private volatile Phase phase = Phase.IDLE;
+    public Phase phase() { return phase; }
     private volatile String status = "No operation performed";
     private volatile List<String> results = List.of();
     private IdentityStore identities;
@@ -280,10 +283,10 @@ public final class WorkspaceController {
     }
     private interface Work { void run() throws Exception; }
     private synchronized void task(String description, Work action) {
-        if (busy()) { status = "Operation refused: another operation is active or uncertain"; notifyChanged(); return; }
-        busy = true; status = description; notifyChanged();
+        if (busy()) { phase = Phase.BUSY; status = "Operation refused: another operation is active or uncertain"; notifyChanged(); return; }
+        busy = true; phase = Phase.RUNNING; status = description; notifyChanged();
         worker.execute(() -> {
-            try { action.run(); lastFailure = null; status = "Operation completed; inspect verification evidence"; }
+            try { action.run(); lastFailure = null; phase = Phase.COMPLETED; status = "Operation completed; inspect verification evidence"; }
             catch (Exception e) {
                 lastFailure = ActionFailure.describe(e);
                 current = null;
@@ -292,7 +295,7 @@ public final class WorkspaceController {
                     try { refreshNow(); }
                     catch (Exception readError) { android.util.Log.w("UltimateIMS","Live refresh after failure: " + ActionFailure.describe(readError)); }
                 }
-                status = "Operation failed or unknown: " + lastFailure;
+                phase = Phase.FAILED_OR_UNKNOWN; status = "Operation failed or unknown: " + lastFailure;
                 android.util.Log.w("UltimateIMS", status);
             }
             finally { busy = false; notifyChanged(); }

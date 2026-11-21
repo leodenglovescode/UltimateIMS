@@ -34,7 +34,9 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         @Override public void onReceive(Context context, Intent intent) { render(); }
     };
     private FrameworkReader.Snapshot snapshot;
+    public static final class LaunchState extends androidx.lifecycle.ViewModel { boolean created; }
     private int page;
+    private boolean returnToCalling;
     private String appliedLanguage;
     private int selectedSub = -1;
     private boolean reading;
@@ -60,18 +62,29 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        androidx.activity.EdgeToEdge.enable(this,
+                androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT),
+                androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT));
+        getWindow().setNavigationBarContrastEnforced(false);
+        getWindow().setStatusBarContrastEnforced(false);
+        LaunchState launch = new androidx.lifecycle.ViewModelProvider(this).get(LaunchState.class);
+        boolean configurationRecreation = launch.created; launch.created = true;
         workspace = ((UltimateApplication)getApplication()).workspace();
         panels = new FeaturePanels(this, workspace, this::render);
         if (savedInstanceState != null) panels.restoreState(savedInstanceState.getBundle("panels"));
         page = getIntent().getIntExtra("page",0);
-        if (savedInstanceState != null) { page = savedInstanceState.getInt("page"); selectedSub = savedInstanceState.getInt("sim", -1); }
+        if (savedInstanceState != null) { if (configurationRecreation) page = savedInstanceState.getInt("page"); selectedSub = savedInstanceState.getInt("sim", -1); }
         page = Math.max(0,Math.min(page,pages.length-1));
         LinearLayout root = MaterialUi.column(this);
         root.setBackgroundColor(MaterialUi.color(this,com.google.android.material.R.attr.colorSurface));
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             var bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
             var keyboard = insets.getInsets(WindowInsets.Type.ime());
-            v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom)); return insets;
+            // BottomNavigationView 自己处理底部系统栏，根节点不能再重复留白。
+            boolean imeVisible = insets.isVisible(WindowInsets.Type.ime());
+            v.setPadding(bars.left,bars.top,bars.right,imeVisible ? keyboard.bottom : drawer != null ? bars.bottom : 0);
+            if (navigation != null && drawer == null) navigation.setVisibility(imeVisible ? View.GONE : View.VISIBLE);
+            return insets.inset(bars.left,bars.top,bars.right,0);
         });
         boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         var barsController = androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());
@@ -91,6 +104,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         });
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         navigation = new com.google.android.material.bottomnavigation.BottomNavigationView(this);
+        navigation.setBackgroundTintList(android.content.res.ColorStateList.valueOf(MaterialUi.color(this,com.google.android.material.R.attr.colorSurfaceContainer)));
         navigation.setLabelVisibilityMode(com.google.android.material.navigation.NavigationBarView.LABEL_VISIBILITY_LABELED);
         int[] destinations = {0,1,3,4,5};
         int[] labels = {R.string.nav_home,R.string.nav_ims,R.string.nav_network,R.string.nav_tools,R.string.nav_settings};
@@ -119,6 +133,12 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         } else { root.addView(navigation,new LinearLayout.LayoutParams(-1,-2)); setContentView(root); }
         render();
     }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent);
+        if (Intent.ACTION_MAIN.equals(intent.getAction())) { page = 0; scroll.scrollTo(0,0); render(); }
+    }
+    private boolean autoConnectEnabled() { return getPreferences(MODE_PRIVATE).getBoolean("auto_connect",true); }
+    private void updateAutoConnection(boolean foreground) { workspace.backend.foregroundAutoConnect(chosenBackend(),autoConnectEnabled(),foreground); }
     private void navigate(int destination) {
         if (destination == page) return;
         page = destination; scroll.scrollTo(0,0); render();
@@ -138,9 +158,13 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             catch (SecurityException | UnsupportedOperationException e) { /* 不可订阅时仍支持明确刷新。 */ }
         }
         if (!Objects.equals(appliedLanguage,LanguagePreferences.resolved(this))) { recreate(); return; }
+        if (returnToCalling) { returnToCalling = false; page = 0; scroll.scrollTo(0,0); render(); }
+        updateAutoConnection(true);
         refresh();
     }
     @Override protected void onStop() {
+        returnToCalling = !isChangingConfigurations();
+        updateAutoConnection(false);
         started = false; readGeneration++;
         unregisterReceiver(powerReceiver); unregisterReceiver(statusReceiver);
         if (Build.VERSION.SDK_INT >= 34 && carrierObservation != null) {
@@ -203,7 +227,10 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (page == 4) { privilegedSimSelector(); panels.attach(body,selectedSub); panels.status(); panels.recovery(); return; }
         if (page == 0) {
             privilegedSimSelector(); panels.attach(content,selectedSub);
-            if (!workspace.backend.ready()) button(R.string.connect_settings,this::openConfigurationPage);
+            if (!workspace.backend.ready()) {
+                MaterialUi.add(body,MaterialUi.row(this,getString(R.string.connection_status),UiStatus.backend(this,workspace.backend),this::openConfigurationPage));
+                if (workspace.backend.status() != BackendStatus.PREPARING) button(R.string.connect_settings,this::openConfigurationPage);
+            }
             panels.radio(); body = content; button(R.string.diagnostics,() -> navigate(2));
             heading(R.string.device_section);
             text(getString(R.string.device,Build.MODEL,Build.VERSION.RELEASE,Build.VERSION.SDK_INT),false);
@@ -252,6 +279,11 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
                 .setTitle(R.string.language).setSingleChoiceItems(languages,LanguagePreferences.selected(this),(dialog,index) -> {
                     dialog.dismiss(); LanguagePreferences.select(this,index); recreate();
                 }).setNegativeButton(R.string.cancel,null).show()));
+        heading(R.string.connection_section);
+        MaterialUi.switchRow(body,getString(R.string.auto_connect),autoConnectEnabled(),true,enabled -> {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("auto_connect",enabled).apply(); updateAutoConnection(true);
+        }).setTooltipText(getString(R.string.auto_connect_help));
+        text(getString(R.string.auto_connect_help),false);
         heading(R.string.appearance);
         text(getString(R.string.theme_system_automatic),false);
         com.google.android.material.materialswitch.MaterialSwitch dynamic = new com.google.android.material.materialswitch.MaterialSwitch(this);
@@ -266,7 +298,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         String[] labels = {getString(R.string.backend_none),getString(R.string.shizuku),getString(R.string.adb),getString(R.string.root)};
         MaterialUi.Choice choice = new MaterialUi.Choice(this,getString(R.string.backend_choose),java.util.Arrays.asList(labels),chosen == null ? 0 : chosen.ordinal()+1,index -> {
             if (workspace.busy() || workspace.backend.bound()) { Toast.makeText(this,R.string.busy,Toast.LENGTH_LONG).show(); render(); return; }
-            getPreferences(MODE_PRIVATE).edit().putString("selected_backend",index == 0 ? "" : BackendSession.Mode.values()[index-1].name()).apply(); render();
+            getPreferences(MODE_PRIVATE).edit().putString("selected_backend",index == 0 ? "" : BackendSession.Mode.values()[index-1].name()).apply(); updateAutoConnection(true); render();
         });
         choice.setEnabled(!workspace.backend.bound() && !workspace.busy()); MaterialUi.add(body,choice);
         panels.attach(content,selectedSub); panels.settings(chosenBackend());

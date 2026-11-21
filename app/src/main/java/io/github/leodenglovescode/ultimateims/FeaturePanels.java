@@ -74,7 +74,8 @@ final class FeaturePanels {
         catch (Exception error) {
             localLog = "Operation refused: " + ActionFailure.describe(error);
             android.util.Log.w("UltimateIMS",localLog);
-            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.action_failed).setMessage(localLog).setPositiveButton(R.string.confirm,null).show();
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.action_failed).setMessage(R.string.operation_failed_unknown)
+                    .setNeutralButton(R.string.technical_details,(d,n) -> technicalDetails(localLog)).setPositiveButton(R.string.confirm,null).show();
             redraw.run();
         }
     }
@@ -131,15 +132,27 @@ final class FeaturePanels {
         case PORTAL_HTTPS -> R.string.key_portal_https;
     }); }
     private String value(RawValue value) { return value.kind() == RawValue.Kind.UNKNOWN ? str(R.string.unknown) : value.kind() == RawValue.Kind.UNSET ? str(R.string.unset) : value.kind() == RawValue.Kind.BOOLEAN ? str(value.payload().equals("true") ? R.string.true_value : R.string.false_value) : value.kind() == RawValue.Kind.INTEGER_ARRAY && value.payload().isEmpty() ? str(R.string.array_empty) : value.payload(); }
+    private void technicalDetails(String raw) {
+        TextView text = MaterialUi.text(activity,raw == null ? "" : raw,false);
+        text.setTypeface(android.graphics.Typeface.MONOSPACE); text.setTextIsSelectable(true);
+        LinearLayout form = MaterialUi.form(activity); MaterialUi.add(form,text);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.technical_details)
+                .setView(MaterialUi.scrollForm(form)).setPositiveButton(R.string.confirm,null).show();
+    }
+    private void operationDetails() {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.read_status).setMessage(UiStatus.operation(activity,workspace))
+                .setNeutralButton(R.string.technical_details,(d,n) -> technicalDetails(workspace.failureReason() == null ? workspace.status() : workspace.failureReason()))
+                .setPositiveButton(R.string.confirm,null).show();
+    }
     void close() { io.shutdown(); }
     void status() {
         LinearLayout previous = body; section(R.string.live_status);
         text(str(workspace.backend.ready() ? R.string.connection_ready : R.string.connection_not_ready));
         if (!workspace.backend.ready() && !activity.configurationVisible()) button(R.string.connect_settings,activity::openConfigurationPage,true);
-        text(activity.getString(R.string.backend_status,workspace.backend.state()));
-        if (workspace.snapshot() != null) text(str(R.string.observed_at)+" " + new java.util.Date(workspace.snapshot().getLong("observedAt")));
-        text(str(R.string.status_local) + "\n" + workspace.status());
-        for (String result : workspace.results()) text(result);
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.connection_status),UiStatus.backend(activity,workspace.backend),() -> technicalDetails(workspace.backend.state())));
+        if (workspace.snapshot() != null) text(str(R.string.observed_at)+" " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.MEDIUM,activity.getResources().getConfiguration().getLocales().get(0)).format(new java.util.Date(workspace.snapshot().getLong("observedAt"))));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.status_local),UiStatus.operation(activity,workspace),() -> technicalDetails(workspace.status())));
+        for (String result : workspace.results()) MaterialUi.add(body,MaterialUi.row(activity,UiStatus.result(activity,result),str(R.string.technical_details),() -> technicalDetails(result)));
         if (workspace.busy()) {
             var progress = new com.google.android.material.progressindicator.LinearProgressIndicator(activity); progress.setIndeterminate(true); MaterialUi.add(body,progress); text(str(R.string.busy));
         }
@@ -230,7 +243,7 @@ final class FeaturePanels {
             var radio = RadioObservation.classify(observed.containsKey("psRegistered") ? observed.getBoolean("psRegistered") : null,observed.containsKey("psRat") ? observed.getInt("psRat") : null,observed.containsKey("nrConnected") ? observed.getBoolean("nrConnected") : null);
             String network = radio == RadioObservation.State.NR_SA ? "5G SA" : radio == RadioObservation.State.NR_NSA ? "5G NSA" : observed.containsKey("psRat") && observed.getInt("psRat") == 13 ? "LTE" : str(R.string.unknown);
             MaterialUi.add(body,MaterialUi.row(activity,str(R.string.network_status),network,null));
-            if (observed.containsKey("identityError")) MaterialUi.add(body,MaterialUi.row(activity,str(R.string.sim_access),str(R.string.access_blocked),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.sim_access).setMessage(observed.getString("identityError")).setPositiveButton(R.string.confirm,null).show()));
+            if (observed.containsKey("identityError")) MaterialUi.add(body,MaterialUi.row(activity,str(R.string.sim_access),str(R.string.access_blocked),() -> technicalDetails(observed.getString("identityError"))));
         }
         persistentVolte();
         section(R.string.radio_controls);
@@ -386,8 +399,8 @@ final class FeaturePanels {
     void settings(BackendSession.Mode chosen) {
         section(R.string.backend_section);
         MaterialUi.switchRow(body,str(R.string.connection_switch),workspace.backend.bound(),chosen != null && !workspace.busy() && !workspace.backend.inFlight(),enabled -> safe(() -> { if (enabled) workspace.backend.start(chosen); else workspace.backend.stop(); }));
-        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.connection_status),str(workspace.backend.ready() ? R.string.connection_ready : R.string.connection_not_ready),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.connection_status).setMessage(workspace.backend.state()).setPositiveButton(R.string.confirm,null).show()));
-        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.read_status),str(workspace.snapshot() == null ? R.string.read_unavailable : R.string.read_ready),() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.read_status).setMessage(workspace.failureReason() == null ? workspace.status() : workspace.failureReason()).setPositiveButton(R.string.confirm,null).show()));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.connection_status),UiStatus.backend(activity,workspace.backend),() -> technicalDetails(workspace.backend.state())));
+        MaterialUi.add(body,MaterialUi.row(activity,str(R.string.read_status),str(workspace.snapshot() == null ? R.string.read_unavailable : R.string.read_ready),this::operationDetails));
         if (chosen == BackendSession.Mode.EMBEDDED_ADB) { section(R.string.wireless_section); text(str(R.string.pair_help));
         button(R.string.pair, () -> wireless(true), workspace.backend.mode() == BackendSession.Mode.EMBEDDED_ADB && !workspace.busy());
         button(R.string.connect_adb, () -> wireless(false), workspace.backend.mode() == BackendSession.Mode.EMBEDDED_ADB && !workspace.busy());
@@ -403,7 +416,7 @@ final class FeaturePanels {
                 ScrollView scroll = new ScrollView(activity); TextView text = MaterialUi.text(activity,contents.toString(),false); text.setPadding(MaterialUi.dp(activity,24),MaterialUi.dp(activity,16),MaterialUi.dp(activity,24),MaterialUi.dp(activity,16)); scroll.addView(text); new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.licenses).setView(scroll).setPositiveButton(R.string.confirm,null).show();
             } catch (Exception e) { throw new IllegalStateException(e); }
         },true);
-        button(R.string.project_links, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.project_links).setItems(new String[]{"Project on GitHub","Official Shizuku"},(d,n) -> activity.startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(n==0?"https://github.com/leodenglovescode/UltimateIMS":"https://shizuku.rikka.app/")))).show(),true);
+        button(R.string.project_links, () -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.project_links).setItems(new String[]{str(R.string.link_project),str(R.string.link_shizuku)},(d,n) -> activity.startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(n==0?"https://github.com/leodenglovescode/UltimateIMS":"https://shizuku.rikka.app/")))).show(),true);
     }
     private void wireless(boolean pair) {
         if (Build.VERSION.SDK_INT >= 37 && activity.checkSelfPermission("android.permission.ACCESS_LOCAL_NETWORK") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -459,7 +472,7 @@ final class FeaturePanels {
         section(R.string.report_section);
         button(R.string.export, () -> export(diagnosticReport()),true);
         button(R.string.app_logs, () -> io.execute(() -> { appLogs = LocalLogs.read(); activity.runOnUiThread(redraw); }),true);
-        text(localLog); text(appLogs);
+        if (!localLog.isBlank() || !appLogs.isBlank()) { section(R.string.raw_output); text(localLog); text(appLogs); }
     }
     private void restoreDialog() {
         try {
@@ -476,7 +489,7 @@ final class FeaturePanels {
         try {
             JSONArray history = workspace.history(); if (history.length() == 0) { Toast.makeText(activity,R.string.no_history,Toast.LENGTH_SHORT).show(); return; }
             String[] rows = new String[history.length()];
-            for (int i=0;i<rows.length;i++) rows[i] = new java.util.Date(history.getJSONObject(i).getLong("time")) + " · " + history.getJSONObject(i).getString("state");
+            for (int i=0;i<rows.length;i++) rows[i] = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.MEDIUM,activity.getResources().getConfiguration().getLocales().get(0)).format(new java.util.Date(history.getJSONObject(i).getLong("time"))) + " · " + UiStatus.historyState(activity,history.getJSONObject(i).getString("state"));
             new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.history).setItems(rows,(d,n) -> safe(() -> {
                 try { bindDraftIdentity(); draft.clear(); clearProfileDrafts(); draft.putAll(workspace.historyDraft(n)); activity.openImsPage(); }
                 catch (Exception e) { throw new IllegalStateException(e); }
@@ -507,7 +520,7 @@ final class FeaturePanels {
             text(activity.getString(R.string.default_data,str(observed.getBoolean("defaultData") ? R.string.yes : R.string.no)));
             text(activity.getString(R.string.sim_country,observed.getString("country",str(R.string.unknown))));
             text(activity.getString(R.string.rat,observed.containsKey("dataRat") ? Integer.toString(observed.getInt("dataRat")) : str(R.string.unknown)));
-            for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","nrState","nrConnected","psRegistered","psRat","displayBaseRat","displayOverride","dataRat","voiceRat","callState","nrRsrpDbm","nrFrameworkLevel","lteRsrpDbm")) MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),String.valueOf(observed.containsKey(key) ? observed.get(key) : str(R.string.unknown)),null));
+            for (String key : List.of("imsRegistered","imsTransport","imsRegistrationTech","voiceOverNrCapable","voiceOverNrAvailable","voice","video","ut","nrState","nrConnected","psRegistered","psRat","displayBaseRat","displayOverride","dataRat","voiceRat","callState","nrRsrpDbm","nrFrameworkLevel","lteRsrpDbm")) MaterialUi.add(body,MaterialUi.row(activity,diagnosticLabel(key),observed.containsKey(key) && observed.get(key) instanceof Boolean flag ? str(flag ? R.string.yes : R.string.no) : String.valueOf(observed.containsKey(key) ? observed.get(key) : str(R.string.unknown)),null));
             Long user = observed.containsKey("mask_USER") ? observed.getLong("mask_USER") : null;
             Long power = observed.containsKey("mask_POWER") ? observed.getLong("mask_POWER") : null;
             Long carrier = observed.containsKey("mask_CARRIER") ? observed.getLong("mask_CARRIER") : null;
@@ -524,12 +537,12 @@ final class FeaturePanels {
         button(R.string.export,() -> export(diagnosticReport()),true);
         section(R.string.apn_section);
         button(R.string.apn,() -> activity.startActivity(new Intent(Settings.ACTION_APN_SETTINGS).putExtra("android.provider.extra.SUB_ID",sub)),sub >= 0);
-        text(str(R.string.apn_explain)); text(workspace.apnStatus());
+        text(str(R.string.apn_explain)); MaterialUi.add(body,MaterialUi.row(activity,str(R.string.apn_read),str(R.string.technical_details),() -> technicalDetails(workspace.apnStatus())));
         button(R.string.apn_read,() -> workspace.apn(sub,null,false),writable() && sub >= 0);
-        button(R.string.apn_profile,() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.apn_profile).setItems(new String[]{"China Mobile CMNET (46000 / 46002 / 46007 / 46008)","T-Mobile LTE (310260)"},(d,n) -> confirm(str(R.string.apn_confirm),() -> workspace.apn(sub,n==0?"CMNET":"TMOBILE",false))).show(),writable() && sub >= 0);
+        button(R.string.apn_profile,() -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setTitle(R.string.apn_profile).setItems(new String[]{str(R.string.apn_cmnet_name),str(R.string.apn_tmobile_name)},(d,n) -> confirm(str(R.string.apn_confirm),() -> workspace.apn(sub,n==0?"CMNET":"TMOBILE",false))).show(),writable() && sub >= 0);
         button(R.string.apn_restore,() -> confirm(str(R.string.apn_confirm),() -> workspace.apn(sub,null,true)),writable() && sub >= 0);
         section(R.string.ip_section); text(str(R.string.ip_consent));
-        button(R.string.public_ip,this::publicIpDialog,true); text(publicIpLocal); text(localLog);
+        button(R.string.public_ip,this::publicIpDialog,true); if (!publicIpLocal.isBlank() || !localLog.isBlank()) { section(R.string.raw_output); text(publicIpLocal); text(localLog); }
     }
     private void publicIpDialog() {
         LinearLayout form = MaterialUi.form(activity); TextInputEditText endpoint = new TextInputEditText(activity); endpoint.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI); endpoint.setSaveEnabled(false); MaterialUi.input(form,endpoint,str(R.string.endpoint_label)).setPlaceholderText("https://api.ipify.org");

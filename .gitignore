@@ -8,3 +8,19 @@ local.properties
 .DS_Store
 .deps/
 dist/
+
+# 本机配置、身份凭据与诊断不得发布。
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.bundle
+*.log
+private/
+.private/
+diagnostics/
+captures/
+docs/evidence/

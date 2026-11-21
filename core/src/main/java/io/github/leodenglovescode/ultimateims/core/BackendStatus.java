@@ -1,0 +1,8 @@
+package io.github.leodenglovescode.ultimateims.core;
+
+/** 状态码用于本地化；运行日志与框架诊断原文独立保存。 */
+public enum BackendStatus {
+    IDLE, READY, PREPARING, SHIZUKU_UNAVAILABLE, SHIZUKU_UNSUPPORTED,
+    PERMISSION_REQUIRED, PERMISSION_DENIED, DISCONNECTED, RECOVERY_REQUIRED,
+    FAILED, STOPPED, STOP_FAILED, PRIVATE_START_REQUIRED, ROOT_STARTING
+}
