@@ -14,6 +14,11 @@ public final class PlatformMethods {
         if (method.getReturnType() != result) throw new NoSuchMethodException("Framework return type mismatch: " + name);
         return call(method, target, args);
     }
+    /** 使用系统提供的重注册入口，不在客户端模拟时序；不存在就明确拒绝。 */
+    public static void resetIms(Object telephony, int slot) throws Exception {
+        if (slot < 0 || slot > 7) throw new IllegalArgumentException("Invalid SIM slot");
+        invoke(telephony,"resetIms",void.class,new Class<?>[]{int.class},slot);
+    }
     public static Object statik(String type, String name, Class<?> result, Class<?>[] signature, Object... args) throws Exception {
         Method method = Class.forName(type).getDeclaredMethod(name, signature);
         if (!Modifier.isStatic(method.getModifiers()) || method.getReturnType() != result) throw new NoSuchMethodException("Framework static signature mismatch: " + name);

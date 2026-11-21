@@ -15,9 +15,7 @@ public final class RadioDisplayProfiles {
                 ConfigKey.NR_ADVANCED_INCLUDE_LTE,RawValue.bool(false),
                 ConfigKey.NR_ADVANCED_PCO,RawValue.integer(0));
             case MAINLAND_BARS -> Map.of(
-                ConfigKey.NR_RSRP,RawValue.integers(List.of(-128,-118,-108,-98)),
-                ConfigKey.NR_SIGNAL_METRICS,RawValue.integer(1),
-                ConfigKey.NR_NSA_LTE_SIGNAL,RawValue.bool(false));
+                ConfigKey.NR_RSRP,RawValue.integers(List.of(-128,-118,-108,-98)));
         };
     }
     /** 添加显示资格频段时保留运营商已有国际频段，不改变基带射频支持。 */

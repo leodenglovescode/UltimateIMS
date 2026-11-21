@@ -11,3 +11,5 @@ TensorIMS 在 revision `0b114fe038c259f5b3889aa82f618f8873b109c7` 使用单卡�
 - https://github.com/ryfineZ/carrier-ims-for-pixel/tree/4312b5a9244a20444cccf5c4a5f763f6fd9d2ab5
 - https://github.com/Pixel-Tailor-CN/TensorIMS/tree/0b114fe038c259f5b3889aa82f618f8873b109c7
 - https://android.googlesource.com/platform/packages/services/Telephony/+/refs/heads/android17-release/src/com/android/phone/PhoneInterfaceManager.java
+
+本项目后续使用独立白名单批量协议与整组核验；配套键和用户偏好保持独立，不能据此推定具体网络故障根因。

@@ -9,6 +9,7 @@ public final class OperationCoordinator {
         SimIdentity verifiedIdentity(int subscriptionId) throws Exception;
         RawValue readRaw(int subscriptionId, ConfigKey key) throws Exception;
         void writeRaw(int subscriptionId, ConfigKey key, RawValue value) throws Exception;
+        void writeCarrierBatch(int subscriptionId, Map<ConfigKey,RawValue> values) throws Exception;
     }
     public record Request(int callerUid, BackendSession.Mode selectedMode, byte[] token,
                           SimIdentity sim, int subscriptionId, int api, Map<ConfigKey, RawValue> target,
@@ -73,7 +74,20 @@ public final class OperationCoordinator {
     private RecoveryJournal.State execute(Request request, RecoveryJournal.Entry entry, Map<ConfigKey, RawValue> changes, RecoveryJournal.State complete) throws Exception {
         journal.save(entry.state(complete == RecoveryJournal.State.VERIFIED ? RecoveryJournal.State.APPLYING : RecoveryJournal.State.RESTORING));
         try {
-            for (var key : ConfigKey.values()) if (changes.containsKey(key)) {
+            Map<ConfigKey,RawValue> carrier = new EnumMap<>(ConfigKey.class);
+            changes.forEach((key,value) -> { if (key.scope == ConfigKey.Scope.CARRIER) carrier.put(key,value); });
+            if (!carrier.isEmpty()) {
+                boolean restoring = complete != RecoveryJournal.State.VERIFIED;
+                Map<ConfigKey,RawValue> validated = CarrierWriteBatch.validate(carrier,request.api(),restoring,request.countryOverrideConfirmed());
+                authorize(request);
+                backend.writeCarrierBatch(request.subscriptionId(),validated);
+                authorize(request);
+                for (var item : validated.entrySet()) {
+                    authorize(request);
+                    if (!item.getValue().equals(backend.readRaw(request.subscriptionId(),item.getKey()))) throw new IllegalStateException("Carrier batch verification failed");
+                }
+            }
+            for (var key : ConfigKey.values()) if (changes.containsKey(key) && key.scope != ConfigKey.Scope.CARRIER) {
                 authorize(request);
                 backend.writeRaw(request.subscriptionId(), key, changes.get(key));
                 authorize(request);

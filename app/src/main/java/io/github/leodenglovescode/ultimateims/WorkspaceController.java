@@ -70,7 +70,7 @@ public final class WorkspaceController {
     }
     private final class DeviceBackend implements OperationCoordinator.Backend {
         final Map<Integer,String> expected = new HashMap<>();
-        boolean restoring;
+        boolean restoring, countryConfirmed;
         DeviceBackend() { for (Bundle sim : sims()) expected.put(sim.getInt("sub"), sim.getString("iccid")); }
         @Override public BackendSession.Mode mode() { return backend.mode(); }
         @Override public SimIdentity verifiedIdentity(int sub) throws Exception {
@@ -84,6 +84,13 @@ public final class WorkspaceController {
             Bundle args = new Bundle(); args.putInt("sub", sub); args.putString("key", key.name()); args.putString("expectedIccid", expected.get(sub)); return args;
         }
         @Override public RawValue readRaw(int sub, ConfigKey key) throws Exception { return unpack(checked(Protocol.READ, arguments(sub,key))); }
+        @Override public void writeCarrierBatch(int sub, Map<ConfigKey,RawValue> values) throws Exception {
+            Bundle args = new Bundle(); args.putInt("sub",sub); args.putString("expectedIccid",expected.get(sub));
+            args.putBoolean("restore",restoring); args.putBoolean("countryConfirmed",countryConfirmed);
+            Bundle fields = new Bundle();
+            values.forEach((key,value) -> { Bundle raw = new Bundle(); raw.putString("kind",value.kind().name()); raw.putString("value",value.payload()); fields.putBundle(key.name(),raw); });
+            args.putBundle("values",fields); checked(Protocol.WRITE_CARRIER_BATCH,args);
+        }
         @Override public void writeRaw(int sub, ConfigKey key, RawValue value) throws Exception {
             Bundle args = arguments(sub,key); args.putString("kind", value.kind().name()); args.putString("value", value.payload()); args.putBoolean("restore", restoring);
             checked(Protocol.WRITE,args);
@@ -115,7 +122,7 @@ public final class WorkspaceController {
     }
     private void applyPlansNow(Map<Integer,Map<ConfigKey,RawValue>> plans, Map<Integer,String> reviewedIdentities, boolean country) throws Exception {
         if (plans.isEmpty() || plans.values().stream().anyMatch(Map::isEmpty)) throw new IllegalArgumentException("No selected changes or subscriptions");
-        Operation op = operation(); ArrayList<String> batch = new ArrayList<>();
+        Operation op = operation(); op.device.countryConfirmed = country; ArrayList<String> batch = new ArrayList<>();
         if (reviewedIdentities != null) {
             // 确认窗口捕获的真实身份不能在后台任务开始时被最新快照悄悄替换。
             op.device.expected.clear(); op.device.expected.putAll(reviewedIdentities);

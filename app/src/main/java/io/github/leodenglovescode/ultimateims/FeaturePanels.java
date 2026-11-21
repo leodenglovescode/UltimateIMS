@@ -88,6 +88,10 @@ final class FeaturePanels {
         case WFC_ROAMING -> R.string.key_wfc_roaming;
         case VT -> R.string.key_vt;
         case VONR -> R.string.key_vonr;
+        case VONR_VISIBLE -> R.string.key_vonr_visible;
+        case WFC_ICON -> R.string.key_wfc_icon;
+        case CROSS_SIM_OPPORTUNISTIC -> R.string.key_cross_sim_opportunistic;
+        case ENHANCED_LTE_DEFAULT -> R.string.key_enhanced_lte_default;
         case CROSS_SIM -> R.string.key_cross_sim;
         case UT -> R.string.key_ut;
         case NR_AVAILABILITY -> R.string.key_nr_availability;
@@ -303,7 +307,7 @@ final class FeaturePanels {
         ConfigurationToggle.State state = ConfigurationToggle.state(key,shown);
         String title = label(key) + (draft.containsKey(key) ? " •" : "");
         if (state == ConfigurationToggle.State.UNKNOWN) title += " · " + str(current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1") ? R.string.preference_default : R.string.unknown);
-        var toggle = MaterialUi.switchRow(parent,title,state == ConfigurationToggle.State.ON,!workspace.busy() && (state != ConfigurationToggle.State.UNKNOWN || (current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1"))),enabled -> safe(() -> saveToggle(key,ConfigurationToggle.target(key,enabled))));
+        var toggle = MaterialUi.switchRow(parent,title,state == ConfigurationToggle.State.ON,!workspace.busy() && (state != ConfigurationToggle.State.UNKNOWN || (current.kind() == RawValue.Kind.INTEGER && current.payload().equals("-1"))),enabled -> safe(() -> saveChanges(CallingConfiguration.target(key,enabled))));
         toggle.setStateDescription(state == ConfigurationToggle.State.UNKNOWN ? str(R.string.unknown) : str(state == ConfigurationToggle.State.ON ? R.string.true_value : R.string.false_value));
         toggle.setTooltipText(activity.getString(R.string.live_value,value(current)));
         MaterialUi.divider(parent);
@@ -318,11 +322,11 @@ final class FeaturePanels {
     }
     private int group(ConfigKey key) {
         return switch (key) {
-            case VOLTE, VONR, VT, CROSS_SIM, UT -> 0;
-            case VOWIFI, WIFI_ONLY, WFC_MODE, WFC_ROAMING_MODE, WFC_ROAMING, EDITABLE_WFC, EDITABLE_WFC_ROAMING -> 1;
+            case VOLTE, VONR, VONR_VISIBLE, VT, CROSS_SIM, CROSS_SIM_OPPORTUNISTIC, UT -> 0;
+            case VOWIFI, WFC_ICON, WIFI_ONLY, WFC_MODE, WFC_ROAMING_MODE, WFC_ROAMING, EDITABLE_WFC, EDITABLE_WFC_ROAMING -> 1;
             case ADVANCED_CALLING_USER, WFC_USER, WFC_USER_MODE, WFC_USER_ROAMING_MODE, WFC_USER_ROAMING, VT_USER, CROSS_SIM_USER, VONR_USER -> 2;
             case NR_AVAILABILITY, NR_RSRP, NR_RSRQ, NR_SINR, NR_SIGNAL_METRICS, NR_NSA_LTE_SIGNAL -> 3;
-            case NR_ICON, NR_ADVANCED_BANDWIDTH, NR_ADVANCED_BANDS, NR_ADVANCED_PCO, NR_ADVANCED_INCLUDE_LTE, LTE_PLUS_BANDWIDTH, LTE, HIDE_LTE_PLUS, SHOW_4G, SHOW_4G_LTE, EDITABLE_LTE, HIDE_LTE_SETTING -> 4;
+            case ENHANCED_LTE_DEFAULT, NR_ICON, NR_ADVANCED_BANDWIDTH, NR_ADVANCED_BANDS, NR_ADVANCED_PCO, NR_ADVANCED_INCLUDE_LTE, LTE_PLUS_BANDWIDTH, LTE, HIDE_LTE_PLUS, SHOW_4G, SHOW_4G_LTE, EDITABLE_LTE, HIDE_LTE_SETTING -> 4;
             default -> 5;
         };
     }

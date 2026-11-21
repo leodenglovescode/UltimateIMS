@@ -29,6 +29,9 @@ public final class CoreSafetyTest {
         @Override public BackendSession.Mode mode() { return BackendSession.Mode.SHIZUKU; }
         @Override public SimIdentity verifiedIdentity(int subId) { return current; }
         @Override public RawValue readRaw(int subId, ConfigKey key) { return unreadable ? RawValue.unknown() : values.getOrDefault(key, RawValue.unset()); }
+        @Override public void writeCarrierBatch(int subId, Map<ConfigKey,RawValue> batch) throws Exception {
+            for (var item : batch.entrySet()) writeRaw(subId,item.getKey(),item.getValue());
+        }
         @Override public void writeRaw(int subId, ConfigKey key, RawValue value) throws Exception {
             writes++; values.put(key, mismatch ? RawValue.bool(false) : value);
             if (replaceAfterWrite) current = SimIdentity.verifiedIccid("89860012345678901235", identityKey);

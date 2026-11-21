@@ -72,3 +72,9 @@ readSimIdentity 是固定窄接口：先核对调用 UID 和 32 字节会话密�
 RadioDisplayProfiles 仅定义两组明确字段、实时匹配、已存原值子集和未提交草稿撤销。NR_NSA_LTE_SIGNAL 与 NR_SIGNAL_METRICS 使用固定 AOSP 白名单键，原 journal 继续按键名保存，旧备份不改名。
 
 确认页面为每卡构建不可变字段计划与当时的已验证 SIM 身份；applyPerSim 后台任务使用该身份进行核验，不能以任务开始时的新快照悄悄替换。失败保留每卡已执行/失败/未执行状态及原值日志。所有开关仍走既有有限协议，没有任意框架调用或 shell 执行器。
+
+## 0.7.0 批量 CarrierConfig 通道
+
+新增窄操作 WRITE_CARRIER_BATCH（11），仍走已认证且全局串行的服务，不提供任意键名或命令接口。协调器先读取所有目标原值并持久保存 PREPARED/APPLYING，再将同一卡 CarrierConfig 键组成不可变集合。DeviceBackend 编码类型化白名单；broker 再次校验 scope、值类型、API 与地区确认，核对真实 SIM；实际需要写入时拒绝通话中操作。
+
+同卡一次 override 请求不等于跨 SIM、跨 SettingsProvider 或基带的原子事务。服务端异步合并，ConfigurationReadback 用单调时钟和整组完整匹配核验，每轮前后验证 SIM；权限异常不盲目重试。超时或任何不匹配继续保留恢复需要状态，不回退多次单键写入。订阅用户偏好与设备设置沿用独立窄操作；最终复核全部目标，避免后写字段导致前一字段失效而误报成功。

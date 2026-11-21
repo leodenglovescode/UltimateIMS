@@ -12,11 +12,11 @@ public class RadioDisplayProfilesTest {
         assertEquals(RawValue.integer(110000),target.get(ConfigKey.NR_ADVANCED_BANDWIDTH));
         assertFalse(target.containsKey(ConfigKey.NR_AVAILABILITY)); assertFalse(target.containsKey(ConfigKey.VONR));
     }
-    @Test public void signalProfileSelectsNrRsrpAndStopsUsingLteForNsaBars() {
+    @Test public void signalProfileLeavesCarrierMeasurementAndNsaSourceUnchanged() {
         var target = RadioDisplayProfiles.target(RadioDisplayProfiles.Name.MAINLAND_BARS);
         assertEquals(RawValue.integers(List.of(-128,-118,-108,-98)),target.get(ConfigKey.NR_RSRP));
-        assertEquals(RawValue.integer(1),target.get(ConfigKey.NR_SIGNAL_METRICS));
-        assertEquals(RawValue.bool(false),target.get(ConfigKey.NR_NSA_LTE_SIGNAL));
+        assertFalse(target.containsKey(ConfigKey.NR_SIGNAL_METRICS));
+        assertFalse(target.containsKey(ConfigKey.NR_NSA_LTE_SIGNAL));
     }
     @Test public void noUnrelatedCarrierOrSimRegionChanges() {
         for (var name : RadioDisplayProfiles.Name.values()) for (var key : RadioDisplayProfiles.target(name).keySet()) {
@@ -30,7 +30,7 @@ public class RadioDisplayProfilesTest {
         var name = RadioDisplayProfiles.Name.MAINLAND_BARS;
         Map<ConfigKey,RawValue> values = new EnumMap<>(RadioDisplayProfiles.target(name));
         assertEquals(RadioDisplayProfiles.State.ON,RadioDisplayProfiles.state(name,values));
-        values.put(ConfigKey.NR_NSA_LTE_SIGNAL,RawValue.bool(true));
+        values.put(ConfigKey.NR_RSRP,RawValue.integers(List.of(-110,-100,-90,-80)));
         assertEquals(RadioDisplayProfiles.State.OFF,RadioDisplayProfiles.state(name,values));
     }
     @Test public void missingOrUnknownValuesAreNeverInferredFromHistory() {

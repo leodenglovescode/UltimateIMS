@@ -32,6 +32,7 @@ public final class PlatformOperations {
                     if (sub != -2) verifySim(sub, args.getString("expectedIccid"));
                     putRaw(result, read(sub, key(args)));
                 }
+                case Protocol.WRITE_CARRIER_BATCH -> writeCarrierBatch(sub,args);
                 case Protocol.WRITE -> {
                     ConfigKey key = key(args);
                     RawValue value = new RawValue(RawValue.Kind.valueOf(args.getString("kind", "UNKNOWN")), args.getString("value", ""));
@@ -55,10 +56,7 @@ public final class PlatformOperations {
                     requireConfirmedIdle(sub, args);
                     int slot = sim(sub).getSimSlotIndex();
                     Object telephony = PlatformMethods.service("phone", "com.android.internal.telephony.ITelephony");
-                    PlatformMethods.invoke(telephony, "disableIms", void.class, new Class<?>[]{int.class}, slot);
-                    // enable 必须在 finally 尝试；失败结果保留为恢复需要，不反复重启。
-                    try { Thread.sleep(300); }
-                    finally { PlatformMethods.invoke(telephony, "enableIms", void.class, new Class<?>[]{int.class}, slot); }
+                    PlatformMethods.resetIms(telephony,slot);
                     result.putBoolean("verified", false); result.putString("status", "IMS restart requested; registration must be observed separately");
                 }
                 default -> throw new IllegalArgumentException("Unsupported operation");
@@ -154,14 +152,45 @@ public final class PlatformOperations {
         } else {
             if (value.kind() == RawValue.Kind.UNSET) throw new UnsupportedOperationException("Selective override deletion cannot be verified");
             PersistableBundle delta = new PersistableBundle();
-            switch (value.kind()) {
-                case BOOLEAN -> delta.putBoolean(key.platformName, Boolean.parseBoolean(value.payload()));
-                case INTEGER -> delta.putInt(key.platformName, Integer.parseInt(value.payload()));
-                case STRING -> delta.putString(key.platformName, value.payload());
-                case INTEGER_ARRAY -> delta.putIntArray(key.platformName, value.payload().isEmpty() ? new int[0] : Arrays.stream(value.payload().split(",")).mapToInt(Integer::parseInt).toArray());
-                default -> throw new IllegalArgumentException("Unsupported value type");
-            }
+            putCarrierValue(delta,key,value);
             override(sub, delta);
+        }
+    }
+    private void writeCarrierBatch(int sub, Bundle args) throws Exception {
+        if (sub < 0) throw new SecurityException("SIM scope required");
+        verifySim(sub,args.getString("expectedIccid"));
+        Bundle encoded = args.getBundle("values");
+        if (encoded == null || encoded.isEmpty() || encoded.size() > ConfigKey.values().length) throw new IllegalArgumentException("Invalid carrier batch");
+        Map<ConfigKey,RawValue> values = new EnumMap<>(ConfigKey.class);
+        for (String name : encoded.keySet()) {
+            ConfigKey key = ConfigKey.valueOf(name); Bundle raw = encoded.getBundle(name);
+            if (raw == null) throw new IllegalArgumentException("Invalid carrier value");
+            values.put(key,new RawValue(RawValue.Kind.valueOf(raw.getString("kind","UNKNOWN")),raw.getString("value","")));
+        }
+        values = CarrierWriteBatch.validate(values,Build.VERSION.SDK_INT,args.getBoolean("restore"),args.getBoolean("countryConfirmed"));
+        boolean alreadyMatches = carrierMatches(sub,values);
+        if (!alreadyMatches) {
+            if (context.getSystemService(TelephonyManager.class).getCallState() != TelephonyManager.CALL_STATE_IDLE) throw new IllegalStateException("A call is active; operation refused");
+            PersistableBundle delta = new PersistableBundle();
+            for (var item : values.entrySet()) putCarrierValue(delta,item.getKey(),item.getValue());
+            verifySim(sub,args.getString("expectedIccid"));
+            // 所有目标同一次提交；服务端异步更新，API 返回不等于完成。
+            override(sub,delta);
+        }
+        ConfigurationReadback.await(values,key -> read(sub,key),
+                () -> verifySim(sub,args.getString("expectedIccid")),android.os.SystemClock::elapsedRealtime,Thread::sleep,4000);
+    }
+    private boolean carrierMatches(int sub, Map<ConfigKey,RawValue> values) throws Exception {
+        for (var item : values.entrySet()) if (!item.getValue().equals(read(sub,item.getKey()))) return false;
+        return true;
+    }
+    private static void putCarrierValue(PersistableBundle bundle, ConfigKey key, RawValue value) {
+        switch (value.kind()) {
+            case BOOLEAN -> bundle.putBoolean(key.platformName,Boolean.parseBoolean(value.payload()));
+            case INTEGER -> bundle.putInt(key.platformName,Integer.parseInt(value.payload()));
+            case STRING -> bundle.putString(key.platformName,value.payload());
+            case INTEGER_ARRAY -> bundle.putIntArray(key.platformName,value.payload().isEmpty() ? new int[0] : Arrays.stream(value.payload().split(",")).mapToInt(Integer::parseInt).toArray());
+            default -> throw new IllegalArgumentException("Unsupported carrier value");
         }
     }
     private void override(int sub, PersistableBundle delta) throws Exception {

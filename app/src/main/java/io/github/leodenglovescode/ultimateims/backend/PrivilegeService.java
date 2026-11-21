@@ -89,7 +89,7 @@ public final class PrivilegeService extends IPrivilegedChannel.Stub {
     }
     @Override public synchronized Bundle invoke(byte[] token, int operation, Bundle args) {
         authenticate(token);
-        if (operation < Protocol.SNAPSHOT || operation > Protocol.APN_RESTORE || args == null) throw new IllegalArgumentException("Invalid operation");
+        if (operation < Protocol.SNAPSHOT || operation > Protocol.WRITE_CARRIER_BATCH || args == null) throw new IllegalArgumentException("Invalid operation");
         boolean delegated = false;
         long identity = Binder.clearCallingIdentity();
         try {
