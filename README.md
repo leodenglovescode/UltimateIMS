@@ -24,6 +24,18 @@ An independent Android app for managing IMS and connectivity settings per SIM. B
 - English and Simplified Chinese, with automatic language selection.
 - Material or frosted-glass styling, system/light/dark themes, and a private photo background.
 
+**Screenshots**
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/screenshots/calling-material-en.png" width="240" alt="UltimateIMS calling controls in the light Material theme" /><br /><sub>Calling · Material</sub></td>
+    <td align="center"><img src="docs/assets/screenshots/appearance-glass-en.png" width="240" alt="UltimateIMS glass appearance controls in English" /><br /><sub>Appearance · Glass</sub></td>
+    <td align="center"><img src="docs/assets/screenshots/network-material-en.png" width="240" alt="UltimateIMS system network settings in English" /><br /><sub>Network settings</sub></td>
+  </tr>
+</table>
+
+<sub>Emulator previews; no real SIM data. Screenshots do not verify IMS registration or carrier connectivity.</sub>
+
 **Get started**
 
 1. Install a build, select a backend, and authorize it. Official [Shizuku](https://shizuku.rikka.app/) is the simplest starting point; private wireless ADB and existing-root modes are also available.
@@ -46,6 +58,18 @@ No analytics, ads, telemetry, or automatic uploads. Network probes, public-IP qu
 - 联网检测门户、已审阅 APN、本地诊断，以及可选的 SIM 地区兼容设置。
 - 英语与简体中文，语言可跟随系统。
 - Material 或磨砂玻璃风格，系统/浅色/深色主题，以及私有照片背景。
+
+**界面预览**
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/screenshots/calling-material-zh.png" width="240" alt="UltimateIMS 浅色 Material 通话控制界面" /><br /><sub>通话 · Material</sub></td>
+    <td align="center"><img src="docs/assets/screenshots/appearance-glass-zh.png" width="240" alt="UltimateIMS 中文磨砂玻璃外观设置" /><br /><sub>外观 · 磨砂玻璃</sub></td>
+    <td align="center"><img src="docs/assets/screenshots/network-material-zh.png" width="240" alt="UltimateIMS 中文系统网络设置" /><br /><sub>网络设置</sub></td>
+  </tr>
+</table>
+
+<sub>模拟器截图，不含真实 SIM 数据；界面预览不代表 IMS 注册或运营商连接验证。</sub>
 
 **开始使用**
 
